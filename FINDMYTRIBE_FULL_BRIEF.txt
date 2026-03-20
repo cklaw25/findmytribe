@@ -1,0 +1,537 @@
+================================================================================
+                    FINDMYTRIBE — FULL PROJECT BRIEF
+              Encode Club AI London 2026 | March 20–22, 2026
+                        Encode Hub, Shoreditch, London
+================================================================================
+
+HACKATHON WINDOW: Friday March 20, 5:00pm → Sunday March 22, 12:00pm (~43 hours)
+SUBMISSION DEADLINE: Sunday March 22, 12:00pm SHARP
+DELIVERABLES: 1) Public GitHub repo  2) Video pitch (YouTube/Loom link)
+GITHUB REPO: https://github.com/cklaw25/findmytribe
+CODE LOCATION (local): C:\findmytribe\
+
+================================================================================
+SECTION 1 — THE HACKATHON
+================================================================================
+
+EVENT: Encode Club AI London 2026
+LOCATION: Encode Hub, 41 Pitfield Street, Shoreditch, London
+FORMAT: 3-day hackathon + conference (talks, workshops, mentors)
+
+COMPETITION TRACKS (pick which to enter on the platform):
+  PRIMARY  → AI Agents
+  SECONDARY→ Onchain AI
+  Others   → Creative AI, Vibe Coding
+
+JUDGING CRITERIA (based on Encode Club history):
+  1. Innovation         — Is the idea novel and non-obvious?
+  2. Technical Execution— Does the demo actually work?
+  3. Real-World Impact  — Does it solve a meaningful problem?
+  4. AI Integration     — Is AI core to the product, not bolted on?
+  5. Pitch Quality      — Is the story clear and compelling?
+  6. Market Potential   — Could this be a real startup?
+
+ON ARRIVAL — DO THESE IMMEDIATELY:
+  - Join Encode Club Discord: discord.com/invite/encodeclub
+  - Check #announcements, #sponsor-challenges, #judging
+  - Note any sponsor APIs with bounties (free credits = use them)
+  - Book a mentor slot for Saturday morning
+  - Confirm Anthropic API key situation (sponsor credits or bring your own)
+
+================================================================================
+SECTION 2 — THE IDEA
+================================================================================
+
+PRODUCT NAME: FindMyTribe
+
+ONE-LINE PITCH:
+  "Find your people. Right now. In this room."
+
+ELEVATOR PITCH (30 seconds):
+  Networking events are broken. Most people arrive, feel lost, and leave
+  without a single meaningful connection. FindMyTribe is an AI-powered event
+  OS — the organiser gets a live dashboard of the whole room, and each
+  attendee gets an AI agent on their phone that finds their most compatible
+  people, shows where they are in real-time, and gives them conversation
+  starters so they can walk up with confidence.
+
+THE PROBLEM:
+  - Social anxiety at events — walking into a room of strangers is terrifying
+  - Missed connections — your dream co-founder was 10 feet away. You never met.
+  - Inefficient networking — 20 minutes talking to someone with zero overlap
+  - No context — everyone has a digital footprint but nobody uses it in realtime
+
+WHO FEELS THIS:
+  - Developers at hackathons (meta: that's us right now)
+  - Founders at startup events
+  - Students at career fairs
+  - Anyone at Luma-based social events
+
+THE SOLUTION — HOW IT WORKS:
+
+  TWO VIEWS:
+
+  [HOST / ORGANISER VIEW — like a Luma OS]
+  - Full dashboard of all attendees + their current zones
+  - Live heatmap: which area of the venue has most people
+  - Social graph visualiser
+  - Identify isolated attendees to go introduce
+  Route: /host
+
+  [ATTENDEE MOBILE VIEW — PWA on their phone]
+  - AI generates a "Tribe List" — top 8 people to meet today
+    * Category 1: Interest Matches (AI semantic similarity)
+    * Category 2: Mutual Friends (shared connections)
+  - Each match shows: name, role, match %, reason why, talking points
+  - Live event map showing only Tribe List members' current zones
+  - Zone check-in: tap which area you're in → your dot moves on the map
+  Route: /tribe/[userId]
+
+  FULL FLOW:
+    User arrives → opens FindMyTribe → AI agent analyses all attendees
+    → generates Tribe List with talking points
+    → sees live map of where those people are
+    → walks up and starts conversation with context and confidence
+
+LOCATION TRACKING — TWO OPTIONS:
+
+  OPTION A (Primary — build this first):
+    Attendee taps which zone they're in (entrance / main hall / workshop /
+    chill zone / outside). Simple, works immediately, no hardware needed.
+
+  OPTION B (Stretch — massive differentiator):
+    ESP32 BLE beacon on lanyard. Passive tracking — no user action needed.
+    Fixed ESP32 anchor nodes around venue detect nearby lanyards via
+    Bluetooth signal strength (RSSI) and auto-update their zone.
+    Works without WiFi. Impressive hardware demo for judges.
+
+WHY THIS WINS THE AI AGENTS TRACK:
+  The matchmaking engine IS an autonomous AI agent:
+    PERCEIVE → reads all attendee profile data
+    REASON   → multi-step compatibility scoring (interests + social graph + goals)
+    ACT      → populates tribe list + generates personalised talking points
+    ADAPT    → re-ranks as new people check in
+  This is not AI as a chatbot wrapper. AI IS the product.
+
+THE META-DEMO (killer judge moment):
+  "We used FindMyTribe at this hackathon to find each other.
+   Here's the app. Here are the matches it generated for us this morning."
+  Judges are AT the event. They ARE the use case.
+
+================================================================================
+SECTION 3 — TECH STACK
+================================================================================
+
+BACKEND:   Python 3.11 + FastAPI
+AI ENGINE: Anthropic Claude API (model: claude-sonnet-4-6)
+DATABASE:  Supabase (Postgres + Realtime subscriptions)
+FRONTEND:  TypeScript + Next.js 15 (PWA — works on mobile browser)
+HARDWARE:  ESP32 (stretch — BLE beacon tracking)
+DEPLOY:    Railway (backend) + Vercel (frontend)
+
+ARCHITECTURE:
+
+  [Attendee Phone PWA]──────┐
+  [Host Dashboard Browser]──┤
+                            ↓
+                   [FastAPI Backend]
+                    /      |      \
+           [Claude API] [Supabase] [Mock Data]
+           (matching)  (realtime)  (15 profiles)
+
+KEY API ENDPOINTS:
+  GET  /attendees              → list all attendees
+  POST /match/{user_id}        → run AI matchmaking → returns top 8 tribe matches
+  POST /location/{user_id}     → update user's current zone
+  GET  /locations              → all current zone data
+  GET  /event/overview         → host dashboard data
+
+================================================================================
+SECTION 4 — PROJECT FILES
+================================================================================
+
+C:\findmytribe\
+├── README.md                          ← GitHub readme
+├── TEAM_BRIEF.md                      ← Team onboarding doc
+├── FINDMYTRIBE_FULL_BRIEF.txt         ← This file
+│
+├── backend\
+│   ├── main.py                        ← FastAPI server (all endpoints)
+│   ├── matchmaker.py                  ← Claude AI matchmaking logic
+│   ├── mock_data.json                 ← 15 realistic fake attendee profiles
+│   ├── simulate_locations.py          ← Animates people moving zones (for demo)
+│   ├── requirements.txt               ← Python dependencies
+│   └── .env.example                   ← Template for API keys
+│
+└── frontend\
+    └── src\
+        ├── app\
+        │   ├── page.tsx               ← Login / demo profile picker
+        │   ├── tribe\[userId]\page.tsx← Attendee view: tribe list + live map
+        │   └── host\page.tsx          ← Organiser dashboard
+        ├── components\
+        │   ├── ProfileCard.tsx        ← Match card with talking points
+        │   └── EventMap.tsx           ← Live zone map (updates in realtime)
+        ├── lib\
+        │   ├── api.ts                 ← All backend API calls
+        │   └── supabase.ts            ← Supabase realtime client
+        └── types\
+            └── index.ts               ← Shared TypeScript types
+
+================================================================================
+SECTION 5 — ENV KEYS (fill these in, share via WhatsApp/Discord)
+================================================================================
+
+backend\.env (create this file, never commit it):
+  ANTHROPIC_API_KEY=sk-ant-...
+  SUPABASE_URL=https://xxx.supabase.co
+  SUPABASE_SERVICE_KEY=eyJ...
+
+frontend\.env.local (create this file, never commit it):
+  NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+  NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+  NEXT_PUBLIC_API_URL=http://localhost:8000
+
+================================================================================
+SECTION 6 — HOW TO RUN
+================================================================================
+
+STEP 1: Clone the repo
+  git clone https://github.com/cklaw25/findmytribe.git
+  cd findmytribe
+
+STEP 2: Backend setup
+  cd backend
+  python -m venv venv
+  venv\Scripts\activate           (Windows)
+  source venv/bin/activate        (Mac/Linux)
+  pip install -r requirements.txt
+  copy .env.example .env          → then open .env and paste the API keys
+
+STEP 3: Frontend setup
+  cd frontend
+  npm install
+  copy .env.local.example .env.local → then open .env.local and paste keys
+
+STEP 4: Run everything
+  Terminal 1 (backend):
+    cd backend && venv\Scripts\activate && uvicorn main:app --reload
+    → API running at http://localhost:8000
+    → API docs/tester at http://localhost:8000/docs
+
+  Terminal 2 (frontend):
+    cd frontend && npm run dev
+    → App at http://localhost:3000
+
+  Terminal 3 (demo simulation — run during pitch):
+    cd backend && venv\Scripts\activate && python simulate_locations.py
+    → Animates attendees moving between zones every 8 seconds
+
+STEP 5: Test a match (once API key is set)
+  Visit: http://localhost:8000/docs
+  POST /match/usr_001 → should return 8 AI-matched profiles with talking points
+
+================================================================================
+SECTION 7 — SUPABASE SETUP (Dev 2 does this once for the whole team)
+================================================================================
+
+1. Go to https://supabase.com → New project → name: findmytribe
+2. Go to SQL Editor → paste and run this:
+
+-------- COPY FROM HERE --------
+create table profiles (
+  id text primary key,
+  name text, role text, company text, bio text,
+  interests text[], goals text, twitter text, github text,
+  past_events text[], mutual_friend_ids text[],
+  created_at timestamptz default now()
+);
+
+create table locations (
+  user_id text primary key,
+  zone text default 'entrance',
+  updated_at timestamptz default now()
+);
+
+create table tribe_list (
+  id uuid primary key default gen_random_uuid(),
+  user_id text, match_id text,
+  score float, reason text, talking_points text[],
+  match_type text, source text,
+  generated_at timestamptz default now()
+);
+
+alter publication supabase_realtime add table locations;
+-------- COPY TO HERE --------
+
+3. Go to Project Settings → API → copy these 3 values → share with team:
+   - Project URL
+   - anon / public key  (goes in frontend .env.local)
+   - service_role key   (goes in backend .env — keep secret)
+
+================================================================================
+SECTION 8 — TEAM & WORK DISTRIBUTION (3 DEVELOPERS)
+================================================================================
+
+TEAM:
+  Dev 1  — Backend / AI Lead
+  Dev 2  — Backend / Infra + Hardware
+  Dev 3  — Frontend
+  Pitcher— Product, deck, video, demo script (non-dev)
+
+--------------------------------------------------------------------------------
+DEV 1 — BACKEND / AI LEAD
+Owns: matchmaker.py, Claude API integration, /match endpoint
+--------------------------------------------------------------------------------
+
+PHASE 1 (Fri 5–10pm):
+  [ ] Set up and test Claude API call with 2 mock profiles
+  [ ] Confirm matchmaker.py returns valid JSON (score, reason, talking_points)
+  [ ] Build rank_attendees() — scores all 15 profiles against a given user
+  [ ] Hook into main.py POST /match/{user_id}
+
+PHASE 2 (Fri 10pm–Sat 2am):
+  [ ] Add mutual friends boost (+15 score if mutual connection)
+  [ ] Add source tag: "interest_match" vs "mutual_friend"
+  [ ] Tune prompt — tighter, faster, more specific talking points
+  [ ] Test all 5 demo users, verify quality of output
+
+PHASE 3 (Sat 8am–6pm):
+  [ ] Add "why you match" explainability text per card
+  [ ] Make match re-run when new attendees check in (optional)
+  [ ] Generate match_type label (collaborator / mentor / peer / founder_match)
+  [ ] [STRETCH] Batch embed all profiles using embeddings for faster matching
+
+PHASE 4 (Sat 6pm–10pm):
+  [ ] Review all match outputs for 5 demo users — ensure quality
+  [ ] Prepare "best case" demo pair (e.g. usr_001 + usr_002 = great match)
+  [ ] Help pitcher explain the AI agent concept clearly
+
+--------------------------------------------------------------------------------
+DEV 2 — BACKEND / INFRA + HARDWARE (STRETCH)
+Owns: Supabase, location endpoints, simulation script, ESP32
+--------------------------------------------------------------------------------
+
+PHASE 1 (Fri 5–10pm):
+  [ ] Create Supabase project, run SQL schema (see Section 7)
+  [ ] Share SUPABASE_URL, anon key, service_role key with team
+  [ ] Test location update: POST /location/usr_001?zone=main_hall
+  [ ] Verify Supabase Realtime subscription works (check table updates live)
+
+PHASE 2 (Fri 10pm–Sat 2am):
+  [ ] Seed Supabase profiles table with mock_data.json (write a seed script)
+  [ ] Run simulate_locations.py and confirm dots move on frontend map
+  [ ] Test that EventMap.tsx polling picks up zone changes
+  [ ] Wire Supabase persistence in POST /match/{user_id}
+
+PHASE 3 (Sat 8am–6pm):
+  [ ] Deploy backend to Railway (railway.app — free tier):
+        npm install -g @railway/cli
+        railway login
+        railway init
+        railway up
+  [ ] Update frontend NEXT_PUBLIC_API_URL to Railway URL
+  [ ] Deploy frontend to Vercel (vercel.com):
+        cd frontend && npx vercel --prod
+  [ ] [STRETCH] ESP32 BLE beacon:
+        Flash beacon firmware (see below)
+        Flash anchor firmware on second board
+        Confirm RSSI readings appear in serial monitor
+        POST zone updates to backend from anchor
+
+ESP32 BEACON FIRMWARE (arduino):
+  #include <BLEDevice.h>
+  #include <BLEAdvertising.h>
+  void setup() {
+    BLEDevice::init("FMT-LANYARD-001");
+    BLEDevice::getAdvertising()->start();
+  }
+  void loop() { delay(1000); }
+
+PHASE 4 (Sat 6pm–10pm):
+  [ ] Confirm deployed URLs work end-to-end
+  [ ] Run simulate_locations.py against production Supabase
+  [ ] If ESP32 working: prepare lanyard + anchor for physical demo
+
+--------------------------------------------------------------------------------
+DEV 3 — FRONTEND
+Owns: All pages in frontend/src/app, ProfileCard, EventMap
+--------------------------------------------------------------------------------
+
+PHASE 1 (Fri 5–10pm):
+  [ ] Clone repo, npm install, verify app runs at localhost:3000
+  [ ] Review existing ProfileCard.tsx and EventMap.tsx
+  [ ] Update globals.css — add any custom fonts or colour variables
+  [ ] Build onboarding page (page.tsx already scaffolded — review and polish)
+  [ ] Test ProfileCard with hardcoded mock data
+
+PHASE 2 (Fri 10pm–Sat 2am):
+  [ ] Wire /tribe/[userId]/page.tsx to POST /match/{user_id}
+  [ ] Confirm tribe list loads and cards render correctly
+  [ ] Confirm EventMap polls /locations and dots appear
+  [ ] Test zone check-in buttons update location via POST /location
+
+PHASE 3 (Sat 8am–6pm):
+  [ ] Mobile responsiveness — test entire app on actual phone
+  [ ] Polish ProfileCard:
+        - Expand/collapse on tap (show all 3 talking points when expanded)
+        - Mutual friend badge (Users icon)
+        - Match type label
+  [ ] Polish EventMap:
+        - Smooth dot transitions between zones
+        - Highlighted dot when user taps "Find on map"
+        - Legend at bottom
+  [ ] Polish Host Dashboard (/host):
+        - Zone bar chart more visual
+        - Attendee grid looks clean
+        - Auto-refreshes every 10s
+  [ ] Add loading skeleton states (not just spinner)
+  [ ] Empty state if no matches yet
+
+PHASE 4 (Sat 6pm–10pm):
+  [ ] Full demo walkthrough on phone — looks good? Fix anything that jars
+  [ ] Update app title/favicon if time allows
+  [ ] Screenshot the app for README and slide deck
+
+================================================================================
+SECTION 9 — TIMELINE
+================================================================================
+
+FRIDAY MARCH 20
+  5:00pm  Arrive at venue. Join Discord. Check sponsor channels.
+  5:30pm  Team standup — confirm roles, share keys, everyone cloned repo
+  6:00pm  ── PHASE 1 STARTS ──────────────────────────────────────────────────
+           Dev 1: Claude API working locally
+           Dev 2: Supabase created, schema run, keys shared
+           Dev 3: App running, reviewing existing code
+           Pitcher: Slide deck draft started, problem/solution written
+  10:00pm ── PHASE 2 STARTS ─────────────────────────────────────────────────
+           Dev 1: /match endpoint returning full tribe list
+           Dev 2: Location WebSocket wired, simulation running
+           Dev 3: Tribe list page wired to API, map showing live dots
+  2:00am  Sleep (at least Dev 3 + Pitcher — backend can push a bit more)
+
+SATURDAY MARCH 21
+  8:00am  Wake up. Quick standup. What's broken? What's the priority?
+  8:30am  ── PHASE 3 STARTS ──────────────────────────────────────────────────
+  12:00pm Checkpoint: can you do the full demo end-to-end? If no, fix it now.
+  1:00pm  Book mentor session if not done — get feedback on pitch angle
+  2:00pm  Pitcher: first full pitch rehearsal with all 3 devs watching
+  6:00pm  ── PHASE 4 STARTS ──────────────────────────────────────────────────
+           Focus: polish, deploy, demo prep
+  8:00pm  Deploy both backend (Railway) and frontend (Vercel)
+  9:00pm  Practice demo on deployed URL (not localhost)
+  10:00pm Record test video pitch
+  11:00pm Final push to GitHub. Rest.
+
+SUNDAY MARCH 22
+  8:00am  Wake up. Bug fixes only — NO new features.
+  9:00am  Record final video pitch (max 3 minutes — see Section 10)
+  10:00am Upload video to YouTube (unlisted) or Loom
+  10:30am Final git push. Update README with video link + live app link.
+  11:00am Submit on Encode Club platform (link in Discord)
+  11:30am Rehearse live judge pitch one last time
+  12:00pm ── SUBMIT ✓ ─────────────────────────────────────────────────────────
+
+================================================================================
+SECTION 10 — PITCH & VIDEO GUIDE
+================================================================================
+
+SLIDE DECK (10 slides max):
+  1. Title      — "FindMyTribe" + tagline: "Find your people. Right now. In this room."
+  2. Problem    — 3 bullet pain points. One powerful stat. Personal story.
+  3. Solution   — Clean diagram: Host view + Attendee view
+  4. Demo       — SWITCH TO APP LIVE. Walk through the flow.
+  5. How It Works— 4-step flow. Mention Claude API as the brain.
+  6. Location   — QR zone check-in (primary) + ESP32 lanyard (stretch/hardware)
+  7. Why AI Agents Track — Perceive → Reason → Act. Not a chatbot.
+  8. Market     — $60B event tech market. Vision: every Luma event globally.
+  9. Business Model — B2B SaaS (organiser pays per event). Freemium attendees.
+  10. Team      — Photos, names, roles. Close: "We used FindMyTribe here today."
+
+DEMO FLOW (live, ~90 seconds):
+  1. Open app on phone at deployed URL
+  2. Select "Aisha Patel" as demo user
+  3. Show loading: "AI is analysing all attendees"
+  4. Show Tribe List — 8 cards with match %, reason, talking points
+  5. Tap "Find on map" on top match → map opens, person highlighted
+  6. Tap a card to expand — show all 3 talking points
+  7. Tap zone button → dot moves on map in real time
+  8. Switch to /host → show organiser dashboard
+
+VIDEO PITCH SCRIPT (3 minutes max):
+  0:00–0:15  Hook: "Raise your hand if you've left a networking event without
+              talking to a single new person."
+  0:15–0:45  Problem: social anxiety, missed connections, no context
+  0:45–1:45  Demo: screen record the app on phone
+  1:45–2:15  Tech: "Claude AI for matchmaking, Supabase realtime for location,
+              optional ESP32 for passive tracking"
+  2:15–2:45  Vision: "Scale to every Luma event globally"
+  2:45–3:00  Team names + GitHub link
+
+RECORD WITH: Loom (loom.com) — free, records screen + face cam simultaneously
+
+JUDGE Q&A — LIKELY QUESTIONS:
+  "Privacy issue?"
+    → Fully opt-in. Location only visible to your tribe list, not 500 strangers.
+      Auto-deleted after event ends.
+  "Why not LinkedIn?"
+    → LinkedIn is passive and async. This is real-time and event-aware.
+      You know who's in the room right now and where.
+  "Why AI and not just tag filtering?"
+    → Tags give you 50 results. Claude understands nuance — two people both
+      building "autonomous systems" even if one calls it robotics and the
+      other calls it AI agents.
+  "Business model?"
+    → B2B SaaS: organisers pay per event. Freemium for attendees.
+      Sponsorship: "Top match sponsored by Anthropic."
+  "Why not Bumble BFF?"
+    → Bumble is async, romantic-leaning, not event-specific. This is
+      professional, real-time, and context-aware.
+  "Could Luma just build this?"
+    → Yes. That's the exit — acquire or deep partnership. Until then,
+      we're the intelligence layer on top of their platform.
+
+================================================================================
+SECTION 11 — SUBMISSION CHECKLIST
+================================================================================
+
+GITHUB REPO (must be public by Sunday 12pm):
+  [ ] README.md with: description, video link, live app link, setup guide
+  [ ] backend/ — all Python files committed
+  [ ] frontend/ — all TypeScript files committed
+  [ ] .env.example and .env.local.example present (no actual keys!)
+  [ ] Video pitch link added to README
+
+ENCODE CLUB SUBMISSION (check Discord for exact form):
+  [ ] Project name: FindMyTribe
+  [ ] GitHub repo: https://github.com/cklaw25/findmytribe
+  [ ] Video pitch: [YouTube/Loom URL]
+  [ ] Track: AI Agents (primary)
+  [ ] Short description (~100 words)
+
+================================================================================
+SECTION 12 — USEFUL LINKS
+================================================================================
+
+GitHub repo        https://github.com/cklaw25/findmytribe
+Encode Club        https://www.encodeclub.com/programmes/ai-london-2026
+Encode Discord     https://discord.com/invite/encodeclub
+Anthropic API docs https://docs.anthropic.com
+Supabase docs      https://supabase.com/docs
+Luma API docs      https://docs.lu.ma/reference/getting-started
+Railway deploy     https://railway.app
+Vercel deploy      https://vercel.com
+Loom (video)       https://loom.com
+Strategy doc       C:\Users\lawch\Documents\Hackathon_Encode_AI_London_2026.md
+
+================================================================================
+REMEMBER:
+  - Check Discord #sponsor-challenges for live bounties and free API credits
+  - The meta-demo is your strongest card — use FindMyTribe at the hackathon
+  - If ESP32 is working even partially, show the hardware to judges
+  - Sunday 12pm is hard cutoff. Stop coding at 11am. Submit early.
+================================================================================
+
+FindMyTribe | Encode Club AI London 2026 | github.com/cklaw25/findmytribe
+================================================================================
