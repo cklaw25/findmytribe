@@ -1,279 +1,254 @@
-# FindMyTribe Product Requirements Document (PRD)
+# FindMyTribe Product Requirements Document (YC-Friendly)
 
-## 1) Product Context
+## 1) Product Goal and Wedge
 
-FindMyTribe is an AI-powered social operating system for in-person networking events. It helps attendees identify the most relevant people to meet, shows where those people are in real time, and provides conversation starters. It also gives organisers a live view of attendee distribution and engagement.
+FindMyTribe helps a person walk into a room of strangers and immediately know who to meet, where they are, and what to say.
 
-The product solves three core problems:
-- Social friction at events (people do not know who to approach).
-- Missed high-value connections (people with strong overlap do not meet).
-- Lack of live context (attendees and organisers cannot see the room state in a useful way).
+The wedge is real-time, in-event matching with proactive nudges. The core loop is:
+- AI builds your tribe list.
+- Live location data shows where they are now.
+- Proactive alert tells you when a match enters your zone.
+- One tap sends a connection intro via Luffa.
 
-## 2) Personas and Primary Use Cases
+## 2) Scope Lock (Single Source of Truth)
 
-### Attendee (Primary)
-- Wants a short list of high-value people to meet now.
-- Needs confidence prompts (talking points) before approaching someone.
-- Needs real-time location hints to find target matches quickly.
+This PRD includes only the features listed in the approved screen-by-screen scope:
+- Web app delivery only (browser-based, mobile-friendly PWA; no native apps).
+- Screen 1: Login/Profile Picker (`/`)
+- Screen 2: Tribe List (`/tribe/[userId]`) including proactive AI alert banner
+- Screen 3: Live Map (`/tribe/[userId]/map` or map tab)
+- Screen 4: Host Dashboard (`/host`)
+- Cross-screen loading, empty, and error states
+- Luffa bot full integration (tribe list message, proactive alerts, connect intro)
 
-Primary use cases:
-- Select own profile and generate top matches.
-- View match rationale and talking points.
-- Find a specific match on the event map.
-- Update own zone and see map refresh.
+If a feature is not listed above, it is out of scope.
 
-### Organiser / Host (Primary)
-- Wants a live operational view of event activity.
-- Needs to identify crowding and low-engagement zones.
-- Needs to spot isolated attendees for intervention.
+## 3) Dependency-Ordered Build Sequence (No Timelines)
 
-Primary use cases:
-- View event overview with all attendee locations.
-- Monitor zone distribution over time.
-- Refresh frequently enough for live event steering.
+### P0 - Screen 2 Core + Alert Banner (Start Here)
+- Header with user name/role, event name, current zone.
+- Tap-in zone check-in row with 5 zones and active highlight.
+- Tribe list card system for 8 matches.
+- Proactive AI alert banner when a match enters your zone.
 
-## 3) Scope
+### P1 - Screen 3 Live Map
+- Zone floor plan with labels and per-zone counts.
+- Dot system (you/tribe/others), legend, and find-on-map pulse/zoom behavior.
 
-### MVP Scope
-- Attendee profile selection and tribe list generation (top 8 matches).
-- AI-generated reason + talking points for each match.
-- Live zone map with check-in based location updates.
-- Host dashboard with event overview and zone distribution.
-- Supabase-backed storage and realtime location stream.
-- Core backend endpoints: `/attendees`, `/match/{user_id}`, `/location/{user_id}`, `/locations`, `/event/overview`.
+### P2 - Screen 1 Login/Profile Picker
+- App branding, event name, and tappable demo profile cards for sign-in-as flow.
 
-### Stretch Scope
-- Passive location tracking with ESP32 BLE lanyard + anchors.
-- Onchain identity primitives and optional connection token concept.
-- Post-event AI follow-up message drafting.
+### P3 - Screen 4 Host Dashboard
+- Top stats, zone chart, attendee grid, social graph, isolated attendees panel.
 
-### Out of Scope (for this PRD baseline)
-- Native mobile apps (iOS/Android); PWA only.
-- Large-scale privacy/compliance frameworks beyond event-level consent controls.
-- Production-grade anti-abuse/fraud systems.
+### P4 - Luffa End-to-End Integration
+- Message bot receives tribe list.
+- Proactive zone-entry messages.
+- Connect button sends intro via Luffa.
 
-## 4) Success Criteria
+### P5 - Loading, Empty, and Error States
+- Required states for all screens and network pathways.
 
-### Product Outcomes
-- Attendee can complete end-to-end "find and approach a match" flow without manual assistance.
-- Organiser can observe meaningful live event state via dashboard.
-- AI output quality is explainable and specific enough for real conversations.
+## 4) Screen-by-Screen Functional Requirements
 
-### MVP Acceptance Outcomes
-- Tribe list returns exactly 8 ranked matches for a valid user.
-- Each match card contains score, reason, and at least 3 talking points.
-- Zone updates are reflected in map and host view within acceptable latency.
+## Screen 1 - Login/Profile Picker (`/`)
 
-## 5) Dependency-Ordered Requirements
-
-## Layer 0 - Foundations
-
-### Functional Requirements
-- `L0-FR1` The system must run locally with separate backend and frontend services.
-- `L0-FR2` Environment variable templates must be present for backend and frontend.
-- `L0-FR3` A mock attendee dataset must exist with enough profile richness to power matching (interests, goals, social context).
-- `L0-FR4` Frontend must include route shells for attendee and host experiences.
+### Must-Have Requirements
+- `S1-FR1` Display app name and tagline: "Find your people. Right now. In this room."
+- `S1-FR2` Display event name: "Encode Club AI London 2026."
+- `S1-FR3` Display grid of demo attendee cards with:
+  - name,
+  - role,
+  - company,
+  - photo placeholder.
+- `S1-FR4` Each card must be tappable and sign in as that person.
 
 ### Acceptance Criteria
-- Backend serves API docs and responds on configured local URL.
-- Frontend boots and reaches base route and core pages.
-- Missing key environment variables fail with actionable errors.
+- Selecting a card routes user into their tribe view context.
+- All required card fields render without fallback errors.
 
-### Dependencies
-- None. This is the prerequisite for all later layers.
+## Screen 2 - Tribe List (`/tribe/[userId]`)
 
-## Layer 1 - Core Data Backbone
+### Header Bar Requirements
+- `S2-FR1` Show current user name + role.
+- `S2-FR2` Show event name.
+- `S2-FR3` Show current zone text ("You're in: <zone>").
 
-### Functional Requirements
-- `L1-FR1` The data model must include `profiles`, `locations`, and `tribe_list`.
-- `L1-FR2` Location records must be keyed by user and track `zone` + `updated_at`.
-- `L1-FR3` Realtime publication/subscription must include `locations`.
-- `L1-FR4` Profiles must support matching fields (interests, goals, past events, mutual connections).
+### Zone Check-In Row Requirements
+- `S2-FR4` Show exactly 5 tappable zones:
+  - Entrance,
+  - Main Hall,
+  - Workshop,
+  - Chill Zone,
+  - Outside.
+- `S2-FR5` Highlight active zone.
+- `S2-FR6` Tapping a zone updates the user's map dot instantly.
+- `S2-FR6a` Location tracking for attendees must use manual tap-in zone updates as the primary and required tracking mechanism.
 
-### Acceptance Criteria
-- Schema can be created from SQL with no manual patching.
-- Location update writes are persisted and observable in realtime channel.
-- Profile records can be seeded and read by backend endpoints.
+### AI Alert Banner Requirements (Key Feature)
+- `S2-FR7` Banner appears unprompted when a tribe match enters the user's current zone.
+- `S2-FR8` Banner copy includes match name and zone ("<name> is in Main Hall right now - go say hi").
+- `S2-FR9` Banner is dismissable.
+- `S2-FR10` Banner uses pulsing animation to attract attention.
 
-### Dependencies
-- Requires Layer 0 environment and service setup.
+### Tribe List Card Requirements (Exactly 8 Cards)
+- `S2-FR11` Display exactly 8 match cards.
+- `S2-FR12` Each card shows:
+  - avatar/photo placeholder,
+  - name + role + company,
+  - match percent,
+  - match type chip (Collaborator, Mentor, Peer, Founder Match),
+  - mutual friend badge when applicable,
+  - one-line reason.
+- `S2-FR13` Each card includes "Find on map" action that switches to map and highlights match dot.
+- `S2-FR14` Tapping card expands to reveal all 3 talking points.
+- `S2-FR15` Each card includes "Connect" button tied to Luffa intro flow.
 
-## Layer 2 - Backend Core Services
-
-### Functional Requirements
-- `L2-FR1` `GET /attendees` must return all available attendee profiles.
-- `L2-FR2` `POST /location/{user_id}` must update attendee zone.
-- `L2-FR3` `GET /locations` must return current zone state for all tracked attendees.
-- `L2-FR4` `GET /event/overview` must aggregate data for organiser dashboard.
-- `L2-FR5` `POST /match/{user_id}` must orchestrate matchmaking and return ranked results.
-
-### Acceptance Criteria
-- Each endpoint returns stable JSON contract and expected HTTP status codes.
-- Invalid user IDs return clear client errors.
-- Endpoint responses are consumable by frontend without adapter hacks.
-
-### Dependencies
-- Requires Layer 1 schema and data availability.
-
-## Layer 3 - AI Matchmaking Engine
-
-### Functional Requirements
-- `L3-FR1` Matchmaker must score all candidate attendees against the requesting user.
-- `L3-FR2` Engine must rank results and return top 8.
-- `L3-FR3` Each match must include:
-  - compatibility score,
-  - concise reason,
-  - at least 3 context-aware talking points,
-  - source category (`interest_match`, `mutual_friend`, etc.).
-- `L3-FR4` Mutual connection signal should boost ranking.
-- `L3-FR5` Output must be deterministic in structure even if AI text varies.
+### Bottom Tab Bar Requirements
+- `S2-FR16` Include two tabs:
+  - Tribe List
+  - Map
 
 ### Acceptance Criteria
-- For a valid user, `/match/{user_id}` always returns 8 structured cards.
-- Returned text references profile-grounded details (not generic filler).
-- JSON parse failures or model errors are handled with retry/fallback behavior.
+- Zone change updates visible zone state and reflected position without page reload.
+- Alert banner triggers only on zone-entry condition and can be dismissed.
+- "Find on map" opens map view with the selected match visibly highlighted.
+- Expanded card always shows exactly 3 talking points.
 
-### Dependencies
-- Requires Layer 2 orchestration endpoint and Layer 1 profile data.
+## Screen 3 - Live Map (`/tribe/[userId]/map` or map tab)
 
-## Layer 4 - Attendee Experience
-
-### Functional Requirements
-- `L4-FR1` Attendee can choose demo/user profile from onboarding route.
-- `L4-FR2` Tribe page must request and render match list from backend.
-- `L4-FR3` Card UI must display score, reason, talking points, and expansion behavior.
-- `L4-FR4` Event map must show current zones for tribe members.
-- `L4-FR5` "Find on map" action must focus/highlight selected match.
-- `L4-FR6` Zone check-in controls must write to `/location/{user_id}` and reflect updates.
-
-### Acceptance Criteria
-- User reaches tribe list and map in one continuous flow.
-- Selecting zone updates map location and persists backend-side.
-- UX handles loading, empty, and transient failure states.
-
-### Dependencies
-- Requires Layer 2 endpoints and Layer 3 matchmaking outputs.
-
-## Layer 5 - Organiser Experience
-
-### Functional Requirements
-- `L5-FR1` Host route must display attendee and zone overview data.
-- `L5-FR2` Dashboard must refresh/subscribe often enough for live operations.
-- `L5-FR3` Host can view room distribution by zone and attendee-level state.
-- `L5-FR4` UI must support quick interpretation during live demo/event operations.
+### Must-Have Requirements
+- `S3-FR1` Render venue floor plan with 5 zones as simple colored rectangles.
+- `S3-FR2` Display zone labels and attendee counts (for example "Main Hall - 12 people").
+- `S3-FR3` Render dot semantics:
+  - You: red pulsing dot,
+  - Your tribe: green named dots,
+  - Others: grey anonymous dots.
+- `S3-FR4` Display legend for You / Your Tribe / Others.
+- `S3-FR5` On "Find on map" from Screen 2, selected target dot pulses and map zooms toward it.
+- `S3-FR6` Include back action to return to tribe list.
 
 ### Acceptance Criteria
-- Dashboard reflects latest zone changes from attendee check-ins/simulation.
-- Zone distribution view updates on regular cadence or realtime feed.
-- Host page remains usable on laptop/tablet without layout breakage.
+- Dot colors and naming rules match role categories with no ambiguity.
+- Highlight/zoom behavior is visible and tied to selected match.
+- Back action restores tribe list context for the same user.
 
-### Dependencies
-- Requires Layers 1-4 to provide reliable location and attendee data.
+## Screen 4 - Host Dashboard (`/host`)
 
-## Layer 6 - Stretch Capabilities
+### Top Stats Requirements
+- `S4-FR1` Show:
+  - total attendees,
+  - active right now,
+  - number of matches made,
+  - most popular zone.
 
-### ESP32 Passive Tracking
-- `L6-FR1` Anchor nodes must detect lanyard beacon proximity and infer zone.
-- `L6-FR2` Inferred zones must publish through existing location API/data path.
-- `L6-FR3` System must allow fallback to manual check-in when hardware unavailable.
+### Zone Heatmap/Bar Chart Requirements
+- `S4-FR2` Show one bar per zone with headcount.
+- `S4-FR3` Color intensity communicates crowdedness.
+- `S4-FR4` Chart updates every 10 seconds.
 
-Acceptance criteria:
-- At least one beacon/anchor pair can generate observable zone updates.
-- Hardware pipeline does not break manual MVP flow.
+### Attendee Grid Requirements
+- `S4-FR5` Show attendee cards with name, role, company, and current zone.
+- `S4-FR6` Show "isolated" badge when attendee is alone in a zone.
+- `S4-FR7` Grid auto-refreshes.
 
-### Onchain Identity / Connection Token
-- `L6-FR4` Optional wallet identity link can attach to attendee profile.
-- `L6-FR5` Optional "we met" token concept can be represented for demo narrative.
+### Social Graph Requirements
+- `S4-FR8` Display force-directed mutual connection graph.
+- `S4-FR9` Nodes represent people; edges represent mutual friend links.
+- `S4-FR10` Cluster structure is visible.
 
-Acceptance criteria:
-- Feature can be toggled off without impacting MVP.
-- Demo path clearly separates speculative/onchain components from core flow.
+### Isolated Panel Requirements
+- `S4-FR11` Show list of attendees currently alone in a zone.
+- `S4-FR12` Include "Go introduce" prompt for organiser action.
 
-### Post-Event Follow-Up AI
-- `L6-FR6` System can draft post-event intro/follow-up message from match context.
+### Acceptance Criteria
+- Dashboard updates every 10 seconds without manual refresh.
+- Isolated status is consistent between attendee grid and isolated panel.
+- Social graph renders using current relationship data.
 
-Acceptance criteria:
-- Generated follow-up references real shared context from profile/match data.
+## 5) Cross-Screen States (Mandatory)
 
-### Dependencies
-- Requires stable Layers 1-5; stretch modules must integrate via existing contracts.
+### Loading States
+- `UX-FR1` AI analysis loading must show step-by-step text:
+  - "Reading profiles..."
+  - "Scoring interests..."
+  - "Building your tribe..."
+- `UX-FR2` Use skeleton card placeholders during list/card loading.
 
-## 6) Non-Functional Requirements
+### Empty States
+- `UX-FR3` Empty tribe state message: "AI is still analysing - check back in a moment."
+- `UX-FR4` No zone data state message: "Be the first to check in."
 
-### Performance
-- Match generation should complete quickly enough for interactive use (target: seconds, not minutes).
-- Location updates should propagate fast enough to appear near-real-time in map/dashboard.
+### Error States
+- `UX-FR5` API failures must show friendly error message and retry button.
 
-### Reliability
-- Core endpoints should fail gracefully with explicit error payloads.
-- Frontend must surface recoverable errors and allow retry actions.
+### Acceptance Criteria
+- Every screen has explicit loading, empty, and error handling UI.
+- Retry actions call the same failed request and recover when backend is healthy.
 
-### Privacy and Safety
-- Participation is opt-in at event level.
-- Location visibility should be scoped to necessary product contexts (attendee tribe, organiser dashboard).
-- Event data retention policy should default to short-lived storage after event ends.
+## 6) Luffa Bot Full Integration (Must-Have)
 
-### Observability
-- Backend should log endpoint errors and AI call failures for demo/debug readiness.
+### Required Flows
+- `LB-FR1` User can message Luffa bot and receive their tribe list in chat.
+- `LB-FR2` Luffa proactively messages user when a match enters their current zone.
+- `LB-FR3` Pressing "Connect" sends intro via Luffa.
 
-## 7) Data Model and API Contract Summary
+### Required Message Format
+- `LB-FR4` Luffa tribe/match message must include:
+  - name,
+  - role,
+  - match percent,
+  - one talking point.
 
-### Core Entities
-- `Profile`: id, name, role, company, bio, interests[], goals, social links, past_events[], mutual_friend_ids[].
-- `Location`: user_id, zone, updated_at.
-- `TribeMatch`: user_id, match_id, score, reason, talking_points[], match_type, source, generated_at.
+### Trigger Requirements
+- `LB-FR5` Zone-entry trigger fires when:
+  - user zone is known,
+  - match zone updates into same zone,
+  - match is in that user's tribe list.
 
-### API Contracts
-- `GET /attendees` -> `[Profile]`
-- `POST /match/{user_id}` -> `{ user_id, matches: TribeMatch[] }` (8 items)
-- `POST /location/{user_id}?zone=<zone>` -> `{ user_id, zone, updated_at }`
-- `GET /locations` -> `[Location]`
-- `GET /event/overview` -> `{ totals, zones, attendees, updated_at }` (exact shape implementation-owned)
+### Acceptance Criteria
+- Tribe list can be delivered through Luffa chat for signed-in user.
+- Proactive Luffa zone-entry notification arrives after qualifying zone event.
+- Connect action sends structured intro containing required fields.
 
-## 8) Risks, Assumptions, and Constraints
+## 7) Data and Event Contracts (Only Required Fields)
 
-### Assumptions
-- Attendee profile data quality is sufficient for meaningful AI matching.
-- Supabase realtime remains stable throughout event use.
-- API keys and environment values are correctly configured.
+### Core UI Data Objects
+- `UserContext`: userId, name, role, company, currentZone, eventName.
+- `TribeCard`: matchId, name, role, company, avatar, matchPercent, matchType, mutualFriend, reasonLine, talkingPoints[3].
+- `LocationState`: userId, zone, category (self|tribe|other), updatedAt.
+- `HostStats`: totalAttendees, activeNow, matchesMade, mostPopularZone.
+- `IsolatedEntry`: userId, name, role, company, zone.
 
-### Risks
-- AI output may become generic if prompts or profile depth are weak.
-- Realtime lag can reduce trust in map/dashboard usefulness.
-- Stretch hardware may fail under venue constraints (signal noise, setup time).
+### Event Triggers
+- `EVT-1` `zoneChanged(userId, zone)`
+- `EVT-2` `matchEnteredUserZone(userId, matchId, zone)` -> drives alert banner + Luffa proactive message.
+- `EVT-3` `connectPressed(userId, matchId)` -> drives Luffa intro send.
 
-### Mitigations
-- Keep a validated mock dataset and a known-good demo user.
-- Provide simulation script as deterministic fallback for realtime demo.
-- Keep stretch features isolated behind feature flags/fallback paths.
+## 8) Non-Functional Requirements
 
-## 9) Dependency-Ordered Milestone Checklist (No Dates)
+- `NFR-1` Zone change to UI feedback must feel immediate for demo usage.
+- `NFR-2` Dashboard auto-refresh interval is fixed at 10 seconds.
+- `NFR-3` Core UI must remain usable on phone (attendee) and laptop/tablet (host).
+- `NFR-4` Failures must be recoverable by retry from screen-level error state.
 
-1. **Foundation Ready**
-   - Local backend/frontend run.
-   - Env templates complete.
-   - Mock profiles available.
-2. **Data Backbone Ready**
-   - Supabase schema created.
-   - Realtime location publication enabled.
-   - Seed data loaded.
-3. **API Baseline Ready**
-   - All core endpoints implemented and contract-tested.
-4. **AI Matching Ready**
-   - Top-8 ranked outputs with reason + talking points.
-   - Error handling and response shape stabilized.
-5. **Attendee UX Ready**
-   - Onboarding -> tribe list -> map -> zone update flow works.
-6. **Host UX Ready**
-   - Dashboard reflects live attendee/zone state.
-7. **Stretch Integrations Ready (Optional)**
-   - ESP32 pipeline integrated or safely disabled.
-   - Onchain and follow-up modules demoable without impacting MVP.
+## 9) Out of Scope / Do Not Build
 
-## 10) Open Decisions for Implementation Phase
+Do not build anything not explicitly listed in this PRD. Specifically out of scope:
+- Native mobile apps; this product is web app only.
+- Extra screens or navigation paths beyond the 4 listed screens and map tab/back behavior.
+- Additional analytics panels or admin tooling not listed under Screen 4.
+- Any feature experiments not tied to tribe list, map, host dashboard, loading states, or Luffa flows.
+- Unspecified integrations beyond Luffa requirements above.
+- Passive hardware tracking implementations (for example BLE beacon-based auto-location) for this scoped build.
 
-- Define exact zone taxonomy and naming consistency across frontend/backend.
-- Confirm final JSON schema for `event/overview` to avoid frontend drift.
-- Decide whether location updates are polling-only, realtime-only, or hybrid.
-- Define retention and cleanup job for post-event data.
+## 10) Final Acceptance Checklist
+
+- Screen 2 + alert banner works end-to-end first.
+- Screen 3 map behaviors work from Screen 2 actions.
+- Screen 1 profile picker signs into correct user context.
+- Screen 4 dashboard panels render and refresh every 10 seconds.
+- Loading, empty, and error states exist on every screen.
+- Luffa flows work end-to-end for tribe message, proactive zone alerts, and Connect intro.
+- No unlisted features are included.
 
