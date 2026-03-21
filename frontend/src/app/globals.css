@@ -1,26 +1,72 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --cream:       #F5F0E8;
+  --cream-dark:  #EDE8DC;
+  --card:        #F0EBE0;
+  --card-border: #E2DDD2;
+  --green:       #5A7A5C;
+  --green-lt:    #D6E8D6;
+  --green-mid:   #8DAE8F;
+  --text:        #1C1A17;
+  --text-2:      #6B6459;
+  --text-3:      #A09890;
+  --red-soft:    #C47A6A;
+  --amber:       #C49A3C;
+  --radius:      18px;
+  --radius-sm:   11px;
+  --shadow:      0 2px 20px rgba(90,80,60,.09);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-background: var(--cream);
+  --color-foreground: var(--text);
+  --font-sans:  var(--font-geist-sans);
+  --font-mono:  var(--font-geist-mono);
+  --font-serif: var(--font-instrument-serif);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--cream);
+  color: var(--text);
+  font-family: var(--font-geist-sans), sans-serif;
+  font-size: 15px;
+  overflow-x: hidden;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .35; }
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes prog {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+@keyframes selfring {
+  0%   { box-shadow: 0 0 0 0   rgba(28,26,23,.3), 0 2px 10px rgba(0,0,0,.14); }
+  70%  { box-shadow: 0 0 0 9px rgba(28,26,23,0),  0 2px 10px rgba(0,0,0,.14); }
+  100% { box-shadow: 0 0 0 0   rgba(28,26,23,0),  0 2px 10px rgba(0,0,0,.14); }
+}
+
+@keyframes highlightring {
+  0%   { box-shadow: 0 0 0 0    rgba(196,154,60,.5), 0 2px 10px rgba(0,0,0,.14); }
+  70%  { box-shadow: 0 0 0 10px rgba(196,154,60,0),  0 2px 10px rgba(0,0,0,.14); }
+  100% { box-shadow: 0 0 0 0    rgba(196,154,60,0),  0 2px 10px rgba(0,0,0,.14); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }

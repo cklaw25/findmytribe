@@ -1,34 +1,41 @@
 "use client";
 import { useEffect, useState } from "react";
-import { TribeMatch, Zone, ZonePosition } from "@/types";
+import { TribeMatch, Zone } from "@/types";
 
-const ZONE_POSITIONS: Record<Zone, ZonePosition> = {
-  entrance:  { x: 50, y: 85, label: "Entrance" },
-  main_hall: { x: 50, y: 52, label: "Main Hall" },
-  workshop:  { x: 78, y: 28, label: "Workshop" },
-  chill_zone:{ x: 22, y: 28, label: "Chill Zone" },
-  outside:   { x: 50, y: 8,  label: "Outside" },
-  unknown:   { x: 50, y: 52, label: "" },
-};
-
-const AVATAR_COLORS = [
-  "bg-violet-500", "bg-pink-500", "bg-amber-500",
-  "bg-teal-500", "bg-emerald-500", "bg-rose-500",
+// Zone regions (matching HTML prototype geometry)
+const ZONE_REGIONS: { key: string; label: string; style: React.CSSProperties }[] = [
+  { key: "entrance",   label: "Entrance",   style: { top: "2%",  left: "2%",  width: "44%", height: "16%", background: "rgba(240,235,220,.6)" } },
+  { key: "main_hall",  label: "Main Hall",  style: { top: "20%", left: "2%",  width: "60%", height: "42%", background: "rgba(220,232,220,.5)" } },
+  { key: "workshop",   label: "Workshop",   style: { top: "20%", left: "64%", width: "34%", height: "42%", background: "rgba(232,226,248,.45)" } },
+  { key: "chill_zone", label: "Chill Zone", style: { top: "64%", left: "2%",  width: "44%", height: "30%", background: "rgba(222,242,232,.45)" } },
+  { key: "outside",    label: "Outside",    style: { top: "64%", left: "48%", width: "50%", height: "30%", background: "rgba(248,230,224,.4)" } },
 ];
 
-function getDotColor(id: string) {
-  return AVATAR_COLORS[id.charCodeAt(id.length - 1) % AVATAR_COLORS.length];
+// Centre points for dot placement (% of canvas)
+const ZONE_CENTRES: Record<string, { cx: number; cy: number }> = {
+  entrance:   { cx: 24, cy: 9  },
+  main_hall:  { cx: 32, cy: 41 },
+  workshop:   { cx: 81, cy: 41 },
+  chill_zone: { cx: 24, cy: 79 },
+  outside:    { cx: 73, cy: 79 },
+  unknown:    { cx: 32, cy: 41 },
+};
+
+// Deterministic jitter so dots don't perfectly overlap
+function jitter(seed: string, range: number) {
+  const n = seed.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  return ((n % (range * 2 + 1)) - range);
 }
 
 interface EventMapProps {
   tribeList: TribeMatch[];
   highlightId?: string | null;
+  selfZone?: Zone;
 }
 
-export function EventMap({ tribeList, highlightId }: EventMapProps) {
+export function EventMap({ tribeList, highlightId, selfZone = "entrance" }: EventMapProps) {
   const [locations, setLocations] = useState<Record<string, Zone>>({});
 
-  // Poll locations from backend every 5s (replace with Supabase realtime once keys are in)
   useEffect(() => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -42,7 +49,7 @@ export function EventMap({ tribeList, highlightId }: EventMapProps) {
         }
         setLocations(map);
       } catch {
-        // silently fail — keep showing last known positions
+        // keep last known positions
       }
     }
 
@@ -51,75 +58,121 @@ export function EventMap({ tribeList, highlightId }: EventMapProps) {
     return () => clearInterval(interval);
   }, []);
 
+  const tribeIds = new Set(tribeList.map((p) => p.id));
+
+  // Collect all dots: self + tribe members
+  const dots = tribeList.map((person) => {
+    const zone = (locations[person.id] as Zone) || "main_hall";
+    const centre = ZONE_CENTRES[zone] || ZONE_CENTRES.unknown;
+    const isHighlighted = person.id === highlightId;
+    return {
+      id: person.id,
+      initials: person.name.split(" ").map((n) => n[0]).join("").slice(0, 2),
+      firstName: person.name.split(" ")[0],
+      left: centre.cx + jitter(person.id + "x", 6),
+      top:  centre.cy + jitter(person.id + "y", 4),
+      isTribe: tribeIds.has(person.id),
+      isHighlighted,
+    };
+  });
+
+  // Self dot
+  const selfCentre = ZONE_CENTRES[selfZone] || ZONE_CENTRES.entrance;
+  const selfDot = {
+    left: selfCentre.cx + jitter("self_x", 4),
+    top:  selfCentre.cy + jitter("self_y", 3),
+  };
+
   return (
-    <div className="relative w-full aspect-[4/3] bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl overflow-hidden border border-gray-200">
-      {/* Zone areas */}
-      {(Object.entries(ZONE_POSITIONS) as [Zone, ZonePosition][])
-        .filter(([zone]) => zone !== "unknown")
-        .map(([zone, pos]) => (
-          <div
-            key={zone}
-            className="absolute text-[10px] text-gray-400 font-medium select-none"
-            style={{
-              left: `${pos.x}%`,
-              top: `${pos.y}%`,
-              transform: "translate(-50%, -50%)",
-            }}
-          >
-            <div className="bg-white/60 backdrop-blur px-2 py-0.5 rounded-full border border-gray-200">
-              {pos.label}
-            </div>
+    <div>
+      {/* Map canvas */}
+      <div style={{
+        margin: "14px 16px 12px", borderRadius: "var(--radius)", overflow: "hidden",
+        border: "1px solid var(--card-border)", boxShadow: "var(--shadow)",
+        aspectRatio: "1 / 1.05", background: "#FDFAF4", position: "relative",
+      }}>
+        {/* Zone regions */}
+        {ZONE_REGIONS.map((zone) => (
+          <div key={zone.key} style={{
+            position: "absolute", borderRadius: 10,
+            border: "1.5px dashed rgba(90,80,60,.14)",
+            display: "flex", alignItems: "flex-start",
+            padding: "8px 10px",
+            fontSize: 10.5, fontWeight: 500,
+            color: "rgba(90,80,60,.45)",
+            letterSpacing: ".03em", textTransform: "uppercase",
+            ...zone.style,
+          }}>
+            {zone.label}
           </div>
         ))}
 
-      {/* Connecting lines (decorative) */}
-      <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-10">
-        <line x1="50%" y1="85%" x2="50%" y2="52%" stroke="#6366f1" strokeWidth="1" strokeDasharray="4 4" />
-        <line x1="50%" y1="52%" x2="78%" y2="28%" stroke="#6366f1" strokeWidth="1" strokeDasharray="4 4" />
-        <line x1="50%" y1="52%" x2="22%" y2="28%" stroke="#6366f1" strokeWidth="1" strokeDasharray="4 4" />
-        <line x1="50%" y1="52%" x2="50%" y2="8%"  stroke="#6366f1" strokeWidth="1" strokeDasharray="4 4" />
-      </svg>
+        {/* Self dot */}
+        <div style={{
+          position: "absolute",
+          left: `${selfDot.left}%`, top: `${selfDot.top}%`,
+          transform: "translate(-50%,-50%)", zIndex: 10,
+        }}>
+          <div style={{
+            width: 30, height: 30, borderRadius: "50%",
+            border: "2.5px solid #fff", boxShadow: "0 2px 10px rgba(0,0,0,.14)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontFamily: "var(--font-instrument-serif), serif",
+            fontSize: 11, color: "#fff", background: "var(--text)",
+            animation: "selfring 2.2s ease-out infinite",
+          }}>
+            Me
+          </div>
+        </div>
 
-      {/* Tribe member dots */}
-      {tribeList.map((person) => {
-        const zone = (locations[person.id] as Zone) || "main_hall";
-        const pos = ZONE_POSITIONS[zone];
-        const isHighlighted = person.id === highlightId;
-
-        // Slight jitter so dots don't overlap perfectly
-        const jitterX = ((person.id.charCodeAt(4) || 0) % 10) - 5;
-        const jitterY = ((person.id.charCodeAt(5) || 0) % 10) - 5;
-
-        return (
-          <div
-            key={person.id}
-            title={`${person.name} · ${pos.label}`}
-            className={`absolute flex flex-col items-center transition-all duration-1000 cursor-pointer`}
-            style={{
-              left: `${pos.x + jitterX}%`,
-              top: `${pos.y + jitterY}%`,
-              transform: "translate(-50%, -50%)",
-            }}
-          >
-            <div
-              className={`${getDotColor(person.id)} ${
-                isHighlighted ? "w-10 h-10 ring-4 ring-yellow-400 ring-offset-1" : "w-8 h-8"
-              } rounded-full border-2 border-white shadow-md flex items-center justify-center text-white text-xs font-bold transition-all`}
-            >
-              {person.name[0]}
+        {/* Tribe + other dots */}
+        {dots.map((dot) => (
+          <div key={dot.id} style={{
+            position: "absolute",
+            left: `${dot.left}%`, top: `${dot.top}%`,
+            transform: "translate(-50%,-50%)",
+            transition: "left .75s cubic-bezier(.22,1,.36,1), top .75s cubic-bezier(.22,1,.36,1)",
+            cursor: "pointer", zIndex: 10,
+          }}>
+            <div style={{
+              width: 30, height: 30, borderRadius: "50%",
+              border: "2.5px solid #fff", boxShadow: "0 2px 10px rgba(0,0,0,.14)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontFamily: "var(--font-instrument-serif), serif",
+              fontSize: 11, color: "#fff",
+              background: dot.isHighlighted ? "var(--amber)" : dot.isTribe ? "var(--green)" : "#BEB5A8",
+              animation: dot.isHighlighted ? "highlightring 1.4s ease-out infinite" : undefined,
+            }}>
+              {dot.initials}
             </div>
-            {isHighlighted && (
-              <span className="text-[10px] font-semibold text-gray-700 bg-white rounded-full px-1.5 shadow mt-0.5 whitespace-nowrap">
-                {person.name.split(" ")[0]}
-              </span>
+            {dot.isHighlighted && (
+              <div style={{
+                position: "absolute", bottom: -17, left: "50%",
+                transform: "translateX(-50%)",
+                fontSize: 9.5, fontWeight: 500, whiteSpace: "nowrap",
+                color: "var(--text-2)",
+              }}>
+                {dot.firstName}
+              </div>
             )}
           </div>
-        );
-      })}
+        ))}
+      </div>
 
       {/* Legend */}
-      <div className="absolute bottom-2 right-2 bg-white/80 backdrop-blur rounded-lg px-2 py-1 text-[10px] text-gray-500">
-        {tribeList.length} people in your tribe
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", padding: "0 20px 10px", fontSize: 12, color: "var(--text-2)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+          <div style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--text)" }} />
+          You
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+          <div style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--green)" }} />
+          Your tribe
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+          <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#BEB5A8" }} />
+          Others
+        </div>
       </div>
     </div>
   );

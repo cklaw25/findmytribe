@@ -13,10 +13,10 @@ _supabase = None
 def get_supabase():
     global _supabase
     if _supabase is None:
-        from supabase import create_client
         url = os.getenv("SUPABASE_URL", "")
         key = os.getenv("SUPABASE_SERVICE_KEY", "")
         if url and key:
+            from supabase import create_client
             _supabase = create_client(url, key)
     return _supabase
 

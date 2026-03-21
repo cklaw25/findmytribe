@@ -42,7 +42,25 @@ def match_two_profiles(a: dict, b: dict) -> dict:
     return json.loads(response.content[0].text)
 
 
+def _mock_match(a: dict, b: dict) -> dict:
+    """Score match by shared interests when no API key is available."""
+    shared = set(a.get("interests", [])) & set(b.get("interests", []))
+    score = min(95, 50 + len(shared) * 10)
+    topic = next(iter(shared), a.get("interests", ["tech"])[0])
+    return {
+        "score": score,
+        "reason": f"Both interested in {topic} — worth a conversation.",
+        "talking_points": [
+            f"Ask about their work on {topic}.",
+            f"You're both at {b.get('company', 'this event')} — compare notes.",
+            "What's the most surprising thing you've learned today?",
+        ],
+        "match_type": "peer",
+    }
+
+
 def build_tribe_list(user: dict, all_attendees: List[dict]) -> List[dict]:
+    use_ai = bool(os.getenv("ANTHROPIC_API_KEY"))
     results = []
     mutual_ids = set(user.get("mutual_friend_ids", []))
 
@@ -50,10 +68,10 @@ def build_tribe_list(user: dict, all_attendees: List[dict]) -> List[dict]:
         if attendee["id"] == user["id"]:
             continue
         try:
-            match = match_two_profiles(user, attendee)
+            match = match_two_profiles(user, attendee) if use_ai else _mock_match(user, attendee)
         except Exception as e:
             print(f"Match error for {attendee['id']}: {e}")
-            continue
+            match = _mock_match(user, attendee)
 
         is_mutual = attendee["id"] in mutual_ids
         if is_mutual:

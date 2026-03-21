@@ -5,42 +5,71 @@ import { getTribeList, updateLocation } from "@/lib/api";
 import { TribeMatch, Zone } from "@/types";
 import { ProfileCard } from "@/components/ProfileCard";
 import { EventMap } from "@/components/EventMap";
-import { MapPin, Users, RefreshCw, Loader2 } from "lucide-react";
+import { LoadingScreen } from "@/components/LoadingScreen";
+import { TopBar } from "@/components/TopBar";
+import { TabBar } from "@/components/TabBar";
+import { AlertStrip } from "@/components/AlertStrip";
+import { ZoneScroll, ZONE_LABELS } from "@/components/ZoneScroll";
 
-const ZONES: Zone[] = ["entrance", "main_hall", "workshop", "chill_zone", "outside"];
+const LOADING_STEPS = [
+  "Reading attendee profiles...",
+  "Scoring interest similarity...",
+  "Checking mutual connections...",
+  "Ranking compatibility...",
+  "Generating conversation starters...",
+  "Tribe list ready.",
+];
+
+// Derive a display name from the user ID (falls back gracefully)
+const USER_NAMES: Record<string, string> = {
+  usr_001: "Aisha",
+  usr_002: "James",
+  usr_003: "Sofia",
+  usr_006: "Luca",
+  usr_015: "Omar",
+};
 
 export default function TribePage({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = use(params);
   const [tribeList, setTribeList] = useState<TribeMatch[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"list" | "map">("list");
+  const [fetching, setFetching] = useState(true);
+  const [loadingDone, setLoadingDone] = useState(false);
+  const [view, setView] = useState<"tribe" | "map">("tribe");
   const [highlightId, setHighlightId] = useState<string | null>(null);
-  const [selectedProfile, setSelectedProfile] = useState<TribeMatch | null>(null);
-  const [currentZone, setCurrentZone] = useState<Zone>("main_hall");
-  const [updating, setUpdating] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [currentZone, setCurrentZone] = useState<Zone>("entrance");
+  const [alert, setAlert] = useState<{ title: string; body: string } | null>(null);
 
+  const firstName = USER_NAMES[userId] ?? "Your";
+
+  // Fetch tribe list on mount
   useEffect(() => {
     async function load() {
-      setLoading(true);
       try {
         const data = await getTribeList(userId);
         setTribeList(data.tribe_list);
+        // Surface an alert for the top match if available
+        if (data.tribe_list.length > 0) {
+          const top = data.tribe_list[0];
+          setAlert({
+            title: `${top.name} is your top match`,
+            body: `${top.match_score}% compatible — ${top.match_reason.split(".")[0]}.`,
+          });
+        }
       } catch (e) {
         console.error(e);
       } finally {
-        setLoading(false);
+        setFetching(false);
       }
     }
     load();
   }, [userId]);
 
-  async function handleZoneChange(zone: Zone) {
-    setCurrentZone(zone);
-    setUpdating(true);
+  async function handleZoneChange(zone: string) {
+    setCurrentZone(zone as Zone);
     try {
-      await updateLocation(userId, zone);
+      await updateLocation(userId, zone as Zone);
     } catch {}
-    setUpdating(false);
   }
 
   function handleViewOnMap(profile: TribeMatch) {
@@ -48,128 +77,101 @@ export default function TribePage({ params }: { params: Promise<{ userId: string
     setView("map");
   }
 
-  if (loading) {
+  // Show loading animation until both fetch AND animation are done
+  const showLoading = fetching || !loadingDone;
+
+  if (showLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-700 flex items-center justify-center">
-        <div className="text-center text-white">
-          <Loader2 size={40} className="animate-spin mx-auto mb-4" />
-          <p className="font-semibold text-lg">Finding your tribe...</p>
-          <p className="text-indigo-200 text-sm mt-1">AI is analysing all attendees</p>
-        </div>
-      </div>
+      <main style={{ background: "var(--cream)", minHeight: "100dvh" }}>
+        <LoadingScreen
+          steps={LOADING_STEPS}
+          onComplete={() => setLoadingDone(true)}
+        />
+      </main>
     );
   }
 
+  const zoneName = ZONE_LABELS[currentZone] ?? currentZone;
+
   return (
-    <main className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-violet-600 to-indigo-600 px-4 pt-10 pb-6">
-        <div className="max-w-sm mx-auto">
-          <p className="text-indigo-200 text-xs font-medium mb-1">YOUR TRIBE AT THIS EVENT</p>
-          <h1 className="text-white text-2xl font-bold">🔮 FindMyTribe</h1>
-          <p className="text-indigo-100 text-sm mt-1">
-            {tribeList.length} people matched for you today
-          </p>
-        </div>
-      </div>
-
-      <div className="max-w-sm mx-auto px-4 -mt-3">
-        {/* Zone check-in */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 mb-4">
-          <div className="flex items-center gap-2 mb-2">
-            <MapPin size={14} className="text-violet-500" />
-            <p className="text-xs font-semibold text-gray-700">
-              Where are you? {updating && <RefreshCw size={10} className="inline animate-spin ml-1" />}
-            </p>
+    <main style={{ background: "var(--cream)", minHeight: "100dvh", paddingBottom: 88 }}>
+      <TopBar
+        title={`${firstName}'s Tribe`}
+        subtitle="AI matched · live"
+        right={
+          <div style={{
+            fontSize: 11.5, fontWeight: 500, padding: "5px 12px",
+            background: "var(--green-lt)", color: "var(--green)",
+            borderRadius: 100, border: "1px solid rgba(90,122,92,.18)", whiteSpace: "nowrap",
+          }}>
+            {zoneName}
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {ZONES.map((zone) => (
-              <button
-                key={zone}
-                onClick={() => handleZoneChange(zone)}
-                className={`text-xs px-3 py-1 rounded-full border transition-all capitalize ${
-                  currentZone === zone
-                    ? "bg-violet-500 text-white border-violet-500"
-                    : "bg-white text-gray-600 border-gray-200 hover:border-violet-300"
-                }`}
-              >
-                {zone.replace("_", " ")}
-              </button>
-            ))}
+        }
+      />
+
+      {view === "tribe" && (
+        <>
+          <ZoneScroll activeZone={currentZone} onChange={handleZoneChange} />
+
+          {alert && (
+            <AlertStrip
+              title={alert.title}
+              body={alert.body}
+              onDismiss={() => setAlert(null)}
+            />
+          )}
+
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", padding: "16px 20px 10px" }}>
+            <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 19 }}>
+              Interest matches
+            </div>
+            <div style={{
+              fontSize: 11.5, fontWeight: 500, color: "var(--text-3)",
+              background: "var(--card)", border: "1px solid var(--card-border)",
+              padding: "2px 10px", borderRadius: 100,
+            }}>
+              {tribeList.length} people
+            </div>
           </div>
-        </div>
 
-        {/* Tab switcher */}
-        <div className="flex bg-gray-200 rounded-xl p-1 mb-4">
-          <button
-            onClick={() => setView("list")}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-all ${
-              view === "list" ? "bg-white shadow text-violet-600" : "text-gray-500"
-            }`}
-          >
-            <Users size={14} />
-            Tribe List
-          </button>
-          <button
-            onClick={() => setView("map")}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-all ${
-              view === "map" ? "bg-white shadow text-violet-600" : "text-gray-500"
-            }`}
-          >
-            <MapPin size={14} />
-            Live Map
-          </button>
-        </div>
-
-        {/* List view */}
-        {view === "list" && (
-          <div className="space-y-3 pb-8">
+          <div style={{ padding: "0 16px", display: "flex", flexDirection: "column", gap: 10 }}>
             {tribeList.map((match) => (
-              <div key={match.id} onClick={() => setSelectedProfile(selectedProfile?.id === match.id ? null : match)}>
+              <div
+                key={match.id}
+                onClick={() => setExpandedId(expandedId === match.id ? null : match.id)}
+              >
                 <ProfileCard
                   profile={match}
                   onViewMap={() => handleViewOnMap(match)}
-                  expanded={selectedProfile?.id === match.id}
+                  expanded={expandedId === match.id}
                 />
               </div>
             ))}
           </div>
-        )}
+        </>
+      )}
 
-        {/* Map view */}
-        {view === "map" && (
-          <div className="pb-8">
-            <EventMap tribeList={tribeList} highlightId={highlightId} />
-            {highlightId && (
-              <div className="mt-3">
-                {tribeList
-                  .filter((p) => p.id === highlightId)
-                  .map((p) => (
-                    <ProfileCard key={p.id} profile={p} expanded />
-                  ))}
-              </div>
-            )}
-            <div className="mt-3 space-y-1">
-              {tribeList.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setHighlightId(p.id === highlightId ? null : p.id)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-all ${
-                    highlightId === p.id ? "bg-violet-50 border border-violet-200" : "bg-white border border-gray-100"
-                  }`}
-                >
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                    {p.name[0]}
-                  </div>
-                  <span className="font-medium text-gray-800">{p.name}</span>
-                  <span className="text-xs text-gray-500 ml-1">{p.role}</span>
-                  <span className="ml-auto text-xs font-semibold text-violet-600">{p.match_score}%</span>
-                </button>
-              ))}
+      {view === "map" && (
+        <>
+          <ZoneScroll activeZone={currentZone} onChange={handleZoneChange} />
+          <EventMap
+            tribeList={tribeList}
+            highlightId={highlightId}
+            selfZone={currentZone}
+          />
+          {highlightId && (
+            <div style={{ padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+              {tribeList
+                .filter((p) => p.id === highlightId)
+                .map((p) => (
+                  <ProfileCard key={p.id} profile={p} expanded />
+                ))}
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </>
+      )}
+
+      <TabBar active={view} onChange={setView} />
     </main>
   );
 }
