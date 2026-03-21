@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { TribeMatch, Zone } from "@/types";
 
 // Zone regions (matching HTML prototype geometry)
@@ -35,6 +35,7 @@ interface EventMapProps {
 
 export function EventMap({ tribeList, highlightId, selfZone = "entrance" }: EventMapProps) {
   const [locations, setLocations] = useState<Record<string, Zone>>({});
+  const highlightRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -75,6 +76,12 @@ export function EventMap({ tribeList, highlightId, selfZone = "entrance" }: Even
       isHighlighted,
     };
   });
+
+  useEffect(() => {
+    if (highlightId && highlightRef.current) {
+      highlightRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [highlightId]);
 
   // Self dot
   const selfCentre = ZONE_CENTRES[selfZone] || ZONE_CENTRES.entrance;
@@ -161,7 +168,7 @@ export function EventMap({ tribeList, highlightId, selfZone = "entrance" }: Even
 
         {/* Tribe + other dots */}
         {dots.map((dot) => (
-          <div key={dot.id} style={{
+          <div key={dot.id} ref={dot.isHighlighted ? highlightRef : undefined} style={{
             position: "absolute",
             left: `${dot.left}%`, top: `${dot.top}%`,
             transform: "translate(-50%,-50%)",
@@ -174,7 +181,7 @@ export function EventMap({ tribeList, highlightId, selfZone = "entrance" }: Even
               display: "flex", alignItems: "center", justifyContent: "center",
               fontFamily: "var(--font-instrument-serif), serif",
               fontSize: 11, color: "#fff",
-              background: dot.isHighlighted ? "var(--amber)" : dot.isTribe ? "var(--green)" : "#BEB5A8",
+              background: dot.isHighlighted ? "#E85D4A" : dot.isTribe ? "var(--green)" : "#BEB5A8",
               animation: dot.isHighlighted ? "highlightring 1.4s ease-out infinite" : undefined,
             }}>
               {dot.initials}
