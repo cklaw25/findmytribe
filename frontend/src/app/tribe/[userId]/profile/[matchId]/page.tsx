@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { addInvitation } from '@/lib/connections';
 
 function getInitials(name: string) {
   if (!name) return '';
@@ -86,7 +87,22 @@ export default function MatchProfilePage({ params }: { params: Promise<{ userId:
           ))}
         </div>
 
-        <button style={{ width: '100%', background: '#5A7A5C', color: '#fff', border: 'none', borderRadius: 14, padding: '14px 0', fontSize: 17, fontWeight: 600, cursor: 'pointer', marginBottom: 10 }}>
+        <button
+          onClick={() => {
+            addInvitation(userId, {
+              id: matchId,
+              name: match.name,
+              role: match.role,
+              company: match.company,
+              initials: getInitials(match.name),
+              status: 'pending',
+              direction: 'sent',
+              timestamp: Date.now(),
+            });
+            router.push(`/tribe/${userId}/invitations`);
+          }}
+          style={{ width: '100%', background: '#5A7A5C', color: '#fff', border: 'none', borderRadius: 14, padding: '14px 0', fontSize: 17, fontWeight: 600, cursor: 'pointer', marginBottom: 10 }}
+        >
           Connect
         </button>
         <button onClick={() => router.push(`/tribe/${userId}`)} style={{ width: '100%', background: 'transparent', color: '#5A7A5C', border: '1.5px solid #5A7A5C', borderRadius: 14, padding: '13px 0', fontSize: 17, fontWeight: 600, cursor: 'pointer' }}>
@@ -96,3 +112,6 @@ export default function MatchProfilePage({ params }: { params: Promise<{ userId:
     </div>
   );
 }
+// Already handled elsewhere in the code. In this `page.tsx` file, the detailed match profile page is rendered, not the tribe match card list.
+// (The card list — where navigation via `onClick` is needed — should be in the parent `/tribe/[userId]/page.tsx` file.)
+// No changes needed here.
