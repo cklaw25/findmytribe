@@ -1,6 +1,7 @@
 import json
 import math
 import os
+import time
 from typing import List
 
 _openai_client = None
@@ -8,6 +9,19 @@ _openai_client = None
 PREFILTER_TOP_K = int(os.getenv("TRIBE_PREFILTER_K", "20"))
 EMBEDDING_MODEL = "text-embedding-3-small"
 _embedding_cache: dict = {}  # {profile_id: [float, ...]}
+
+
+def _retry(fn, max_retries=2, backoff=1.0):
+    """Retry a callable with exponential backoff. Returns the result or re-raises."""
+    last_exc = None
+    for attempt in range(max_retries + 1):
+        try:
+            return fn()
+        except Exception as e:
+            last_exc = e
+            if attempt < max_retries:
+                time.sleep(backoff * (2 ** attempt))
+    raise last_exc
 
 
 def _get_client():
@@ -91,7 +105,7 @@ def _batch_match_openai(user: dict, candidates: List[dict]) -> List[dict]:
         + "\n\n".join(candidate_blocks)
     )
 
-    response = client.chat.completions.create(
+    response = _retry(lambda: client.chat.completions.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -101,7 +115,7 @@ def _batch_match_openai(user: dict, candidates: List[dict]) -> List[dict]:
         max_tokens=8192,
         temperature=0.7,
         timeout=30,
-    )
+    ))
 
     data = json.loads(response.choices[0].message.content)
     return data.get("matches", [])
@@ -177,7 +191,7 @@ def _get_embeddings_batch(profiles: List[dict]) -> dict:
 
     try:
         texts = [_build_embedding_text(p) for p in to_fetch]
-        response = client.embeddings.create(model=EMBEDDING_MODEL, input=texts)
+        response = _retry(lambda: client.embeddings.create(model=EMBEDDING_MODEL, input=texts))
         for p, item in zip(to_fetch, response.data):
             _embedding_cache[p["id"]] = item.embedding
             result[p["id"]] = item.embedding

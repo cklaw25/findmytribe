@@ -60,7 +60,12 @@ def get_tribe_list(user_id: str):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    result = build_tribe_list(user, ATTENDEES)
+    try:
+        result = build_tribe_list(user, ATTENDEES)
+    except Exception as e:
+        print(f"build_tribe_list error: {e}")
+        raise HTTPException(status_code=500, detail="Matchmaking failed")
+
     top8 = result["tribe_list"][:8]
 
     # Persist to Supabase if available
@@ -81,8 +86,11 @@ def get_tribe_list(user_id: str):
                 sb.table("tribe_list").upsert(row).execute()
             except Exception:
                 # background column may not exist yet — retry without it
-                row.pop("background", None)
-                sb.table("tribe_list").upsert(row).execute()
+                try:
+                    row.pop("background", None)
+                    sb.table("tribe_list").upsert(row).execute()
+                except Exception:
+                    pass
 
     _matched_users.add(user_id)
 
@@ -114,7 +122,10 @@ def update_location(user_id: str, zone: str):
 
     sb = get_supabase()
     if sb:
-        sb.table("locations").upsert({"user_id": user_id, "zone": zone}).execute()
+        try:
+            sb.table("locations").upsert({"user_id": user_id, "zone": zone}).execute()
+        except Exception as e:
+            print(f"Supabase location upsert error: {e}")
 
     return {"status": "ok", "user_id": user_id, "zone": zone}
 
@@ -123,9 +134,12 @@ def update_location(user_id: str, zone: str):
 def get_location(user_id: str):
     sb = get_supabase()
     if sb:
-        result = sb.table("locations").select("*").eq("user_id", user_id).execute()
-        if result.data:
-            return result.data[0]
+        try:
+            result = sb.table("locations").select("*").eq("user_id", user_id).execute()
+            if result.data:
+                return result.data[0]
+        except Exception as e:
+            print(f"Supabase location fetch error: {e}")
     return {"user_id": user_id, "zone": "main_hall"}
 
 
@@ -133,8 +147,11 @@ def get_location(user_id: str):
 def get_all_locations():
     sb = get_supabase()
     if sb:
-        result = sb.table("locations").select("*").execute()
-        return result.data
+        try:
+            result = sb.table("locations").select("*").execute()
+            return result.data
+        except Exception as e:
+            print(f"Supabase locations fetch error: {e}")
     # Fallback: return mock locations
     return [{"user_id": a["id"], "zone": "main_hall"} for a in ATTENDEES]
 
@@ -145,8 +162,11 @@ def event_overview():
     sb = get_supabase()
     locations = {}
     if sb:
-        loc_data = sb.table("locations").select("*").execute().data
-        locations = {l["user_id"]: l["zone"] for l in loc_data}
+        try:
+            loc_data = sb.table("locations").select("*").execute().data
+            locations = {l["user_id"]: l["zone"] for l in loc_data}
+        except Exception as e:
+            print(f"Supabase overview locations error: {e}")
 
     zone_counts: dict = {}
     attendees_with_zones = []
