@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { use } from "react";
-import { getTribeList, updateLocation } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { getTribeList, updateLocation, getAllLocations } from "@/lib/api";
 import { TribeMatch, Zone } from "@/types";
 import { ProfileCard } from "@/components/ProfileCard";
 import { EventMap } from "@/components/EventMap";
@@ -10,6 +11,7 @@ import { TopBar } from "@/components/TopBar";
 import { TabBar } from "@/components/TabBar";
 import { ZoneScroll, ZONE_LABELS } from "@/components/ZoneScroll";
 import { useZoneContext } from "@/contexts/ZoneAlertContext";
+import { addInvitation } from "@/lib/connections";
 
 const LOADING_STEPS = [
   "Reading attendee profiles...",
@@ -20,7 +22,6 @@ const LOADING_STEPS = [
   "Tribe list ready.",
 ];
 
-// Derive a display name from the user ID (falls back gracefully)
 const USER_NAMES: Record<string, string> = {
   usr_001: "Aisha",
   usr_002: "James",
@@ -31,6 +32,7 @@ const USER_NAMES: Record<string, string> = {
 
 export default function TribePage({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = use(params);
+  const router = useRouter();
   const [tribeList, setTribeList] = useState<TribeMatch[]>([]);
   const [fetching, setFetching] = useState(true);
   const [loadingDone, setLoadingDone] = useState(false);
@@ -41,20 +43,46 @@ export default function TribePage({ params }: { params: Promise<{ userId: string
 
   const firstName = USER_NAMES[userId] ?? "Your";
 
-  // Fetch tribe list on mount
-  useEffect(() => {
-    async function load() {
+async function loadTribe() {
+      setFetching(true);
+      setError(false);
       try {
         const data = await getTribeList(userId);
         setTribeList(data.tribe_list);
-      } catch (e) {
-        console.error(e);
+          if (data.tribe_list.length > 0) {
+            const top = data.tribe_list[0];
+            setAlert({
+              title: `${top.name} is your top match`,
+              body: `${top.match_score}% compatible —
+  ${top.match_reason.split(".")[0]}.`,
+            });
+          }
+        } catch (e) {
+          console.error(e);
+          setError(true);
       } finally {
         setFetching(false);
       }
     }
-    load();
-  }, [userId]);
+
+    useEffect(() => { loadTribe(); }, [userId]);
+
+  useEffect(() => {
+    async function fetchOnline() {
+      try {
+        const locs = await getAllLocations();
+        const ids = new Set<string>(
+          locs.filter((l: { zone?: string }) => l.zone && l.zone !== "unknown").map((l: { user_id: string }) => l.user_id)
+        );
+        setOnlineUserIds(ids);
+      } catch {
+        // keep last known state
+      }
+    }
+    fetchOnline();
+    const interval = setInterval(fetchOnline, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   async function handleZoneChange(zone: string) {
     setCurrentZone(zone as Zone);
@@ -68,7 +96,21 @@ export default function TribePage({ params }: { params: Promise<{ userId: string
     setView("map");
   }
 
-  // Show loading animation until both fetch AND animation are done
+  function handleConnect(profile: TribeMatch) {
+    const initials = profile.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+    addInvitation(userId, {
+      id: profile.id,
+      name: profile.name,
+      role: profile.role,
+      company: profile.company,
+      initials,
+      status: "pending",
+      direction: "sent",
+      timestamp: Date.now(),
+    });
+    router.push(`/tribe/${userId}/invitations`);
+  }
+
   const showLoading = fetching || !loadingDone;
 
   if (showLoading) {
@@ -117,16 +159,103 @@ export default function TribePage({ params }: { params: Promise<{ userId: string
             </div>
           </div>
 
+          {tribeList.length === 0 && (
+            <div style={{
+              margin: "0 16px",
+              padding: "32px 24px",
+              background: "var(--card)",
+              border: "1px solid var(--card-border)",
+              borderRadius: 16,
+              textAlign: "center",
+            }}>
+              <div style={{
+                fontFamily: "var(--font-instrument-serif), serif",
+                fontSize: 18,
+                color: "var(--text-2)",
+                marginBottom: 8,
+              }}>
+                No matches found yet
+              </div>
+              <div style={{
+                fontSize: 13,
+                color: "var(--text-2)",
+                lineHeight: 1.5,
+                marginBottom: 16,
+              }}>
+                The AI may still be processing attendee profiles. Tap below to check again.
+              </div>
+              <button
+                onClick={loadTribe}
+                style={{
+                  padding: "8px 20px",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: "var(--green)",
+                  background: "var(--green-lt)",
+                  border: "1px solid rgba(90,122,92,.18)",
+                  borderRadius: 100,
+                  cursor: "pointer",
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
           <div style={{ padding: "0 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+            {error && (
+              <div style={{
+                background: "var(--card)", border: "1px solid var(--card-border)",
+                borderRadius: "var(--radius)", padding: "32px 20px", textAlign: "center",
+              }}>
+                <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 18, marginBottom: 6 }}>
+                  Something went wrong
+                </div>
+                <div style={{ fontSize: 14, color: "var(--text-2)", fontWeight: 300, marginBottom: 16, lineHeight: 1.5 }}>
+                  We couldn't load your matches. Check your connection and try again.
+                </div>
+                <button
+                  onClick={loadTribe}
+                  style={{
+                    padding: "10px 28px", borderRadius: 100, border: "none",
+                    background: "var(--green)", color: "#fff", cursor: "pointer",
+                    fontFamily: "var(--font-geist-sans), sans-serif", fontSize: 14, fontWeight: 600,
+                  }}
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+            {!error && tribeList.length === 0 && (
+              <div style={{
+                background: "var(--card)", border: "1px solid var(--card-border)",
+                borderRadius: "var(--radius)", padding: "32px 20px", textAlign: "center",
+              }}>
+                <div style={{
+                  width: 48, height: 48, borderRadius: "50%",
+                  border: "2.5px solid var(--card-border)", borderTopColor: "var(--green)",
+                  animation: "spin .9s linear infinite", margin: "0 auto 16px",
+                }} />
+                <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 18, marginBottom: 6 }}>
+                  AI is still analysing
+                </div>
+                <div style={{ fontSize: 14, color: "var(--text-2)", fontWeight: 300, lineHeight: 1.5 }}>
+                  Check back in a moment — your tribe list is being built.
+                </div>
+              </div>
+            )}
             {tribeList.map((match) => (
               <div
                 key={match.id}
-                onClick={() => setExpandedId(expandedId === match.id ? null : match.id)}
+                onClick={() => router.push(`/tribe/${userId}/profile/${match.id}`)}
+                style={{ cursor: "pointer" }}
               >
                 <ProfileCard
                   profile={match}
                   onViewMap={() => handleViewOnMap(match)}
+                  onConnect={() => handleConnect(match)}
                   expanded={expandedId === match.id}
+                  isOnline={onlineUserIds.has(match.id)}
                 />
               </div>
             ))}
@@ -147,14 +276,14 @@ export default function TribePage({ params }: { params: Promise<{ userId: string
               {tribeList
                 .filter((p) => p.id === highlightId)
                 .map((p) => (
-                  <ProfileCard key={p.id} profile={p} expanded />
+                  <ProfileCard key={p.id} profile={p} expanded isOnline={onlineUserIds.has(p.id)} />
                 ))}
             </div>
           )}
         </>
       )}
 
-      <TabBar active={view} onChange={setView} />
+      <TabBar active={view} userId={userId} onChange={setView} />
     </main>
   );
 }
