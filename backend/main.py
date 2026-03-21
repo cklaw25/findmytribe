@@ -32,6 +32,8 @@ app.add_middleware(
 with open("mock_data.json") as f:
     ATTENDEES: list = json.load(f)
 
+_matched_users: set = set()
+
 
 @app.get("/")
 def root():
@@ -73,6 +75,8 @@ def get_tribe_list(user_id: str):
                 "match_type": match["match_type"],
                 "source": match["source"],
             }).execute()
+
+    _matched_users.add(user_id)
 
     return {"user_id": user_id, "tribe_list": top8}
 
@@ -126,8 +130,17 @@ def event_overview():
         zone_counts[zone] = zone_counts.get(zone, 0) + 1
         attendees_with_zones.append({**a, "zone": zone})
 
+    matches_made = len(_matched_users)
+    if sb:
+        try:
+            rows = sb.table("tribe_list").select("user_id").execute().data
+            matches_made = len({r["user_id"] for r in rows})
+        except Exception:
+            pass
+
     return {
         "total_attendees": len(ATTENDEES),
+        "matches_made": matches_made,
         "zone_counts": zone_counts,
         "attendees": attendees_with_zones,
     }
