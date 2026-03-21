@@ -29,3 +29,9 @@ export async function getEventOverview() {
   if (!res.ok) throw new Error("Failed to fetch event overview");
   return res.json();
 }
+
+export async function getDebugMatch(userId: string) {
+  const res = await fetch(`${API_URL}/debug/match/${userId}`);
+  if (!res.ok) throw new Error("Failed to fetch debug match data");
+  return res.json();
+}

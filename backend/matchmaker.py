@@ -5,6 +5,10 @@ from typing import List
 
 _openai_client = None
 
+PREFILTER_TOP_K = int(os.getenv("TRIBE_PREFILTER_K", "20"))
+EMBEDDING_MODEL = "text-embedding-3-small"
+_embedding_cache: dict = {}  # {profile_id: [float, ...]}
+
 
 def _get_client():
     """Lazy-load OpenAI client (only when OPENAI_API_KEY is set)."""
@@ -19,7 +23,7 @@ def _get_client():
 
 SYSTEM_PROMPT = """You are a world-class professional networking matchmaker at a live tech event.
 
-You will receive a USER profile and a list of CANDIDATE profiles. Score every candidate on how valuable a conversation with the user would be.
+You will receive a USER profile and a list of CANDIDATE profiles. You MUST score every single candidate — return exactly one entry per candidate in the "matches" array. Do not skip anyone.
 
 ## Scoring rubric (adapt weights dynamically based on the user's goals and background)
 
@@ -48,6 +52,8 @@ Return a JSON object with a single key "matches" containing an array. Each eleme
   "match_type": "<collaborator|mentor|peer|founder_match|investor>",
   "background": "<2-3 sentence paragraph about this candidate, written for the user — highlight what makes them interesting and relevant>"
 }
+
+IMPORTANT: The "matches" array MUST contain exactly one entry for every candidate. Do not omit any.
 
 Return ONLY valid JSON. No markdown, no code fences, no explanation outside the JSON."""
 
@@ -92,7 +98,7 @@ def _batch_match_openai(user: dict, candidates: List[dict]) -> List[dict]:
             {"role": "user", "content": user_message},
         ],
         response_format={"type": "json_object"},
-        max_tokens=4096,
+        max_tokens=8192,
         temperature=0.7,
         timeout=30,
     )
@@ -129,17 +135,134 @@ def _mock_match(a: dict, b: dict) -> dict:
     }
 
 
-def build_tribe_list(user: dict, all_attendees: List[dict]) -> List[dict]:
-    """Build ranked tribe list using batch OpenAI matching with mock fallback."""
+def _build_embedding_text(profile: dict) -> str:
+    """Concatenate profile fields into a single string for embedding."""
+    parts = [
+        profile.get("role", ""),
+        profile.get("company", ""),
+        profile.get("bio", ""),
+        profile.get("goals", ""),
+        ", ".join(profile.get("interests", [])),
+    ]
+    return " ".join(p for p in parts if p)
+
+
+def _cosine_similarity(a: List[float], b: List[float]) -> float:
+    """Cosine similarity using stdlib math. Returns 0.0 on degenerate input."""
+    dot = sum(x * y for x, y in zip(a, b))
+    mag_a = math.sqrt(sum(x * x for x in a))
+    mag_b = math.sqrt(sum(x * x for x in b))
+    if mag_a == 0 or mag_b == 0:
+        return 0.0
+    return dot / (mag_a * mag_b)
+
+
+def _get_embeddings_batch(profiles: List[dict]) -> dict:
+    """Fetch embeddings for profiles, using cache. Returns {id: [float,...]}."""
+    client = _get_client()
+    if client is None:
+        return {}
+
+    result = {}
+    to_fetch = []
+    for p in profiles:
+        pid = p["id"]
+        if pid in _embedding_cache:
+            result[pid] = _embedding_cache[pid]
+        else:
+            to_fetch.append(p)
+
+    if not to_fetch:
+        return result
+
+    try:
+        texts = [_build_embedding_text(p) for p in to_fetch]
+        response = client.embeddings.create(model=EMBEDDING_MODEL, input=texts)
+        for p, item in zip(to_fetch, response.data):
+            _embedding_cache[p["id"]] = item.embedding
+            result[p["id"]] = item.embedding
+    except Exception as e:
+        print(f"Embedding API error: {e}")
+        return {}
+
+    return result
+
+
+def _prefilter_candidates(
+    user: dict, candidates: List[dict], top_k: int = PREFILTER_TOP_K
+) -> tuple:
+    """Return (filtered_candidates, debug_dict).
+
+    Short-circuits when len(candidates) <= top_k.
+    Falls through to all candidates on any failure.
+    """
+    debug = {
+        "prefilter_top_k": top_k,
+        "candidates_total": len(candidates),
+        "prefilter_skipped": False,
+        "candidates_prefiltered": len(candidates),
+        "embeddings_cached": 0,
+        "embeddings_computed": 0,
+    }
+
+    if len(candidates) <= top_k:
+        debug["prefilter_skipped"] = True
+        return candidates, debug
+
+    all_profiles = [user] + candidates
+    cached_before = len(_embedding_cache)
+    embeddings = _get_embeddings_batch(all_profiles)
+    cached_after = len(_embedding_cache)
+    new_computed = cached_after - cached_before
+
+    debug["embeddings_computed"] = new_computed
+    debug["embeddings_cached"] = len(all_profiles) - new_computed
+
+    user_emb = embeddings.get(user["id"])
+    if not user_emb:
+        debug["prefilter_skipped"] = True
+        return candidates, debug
+
+    scored = []
+    for c in candidates:
+        c_emb = embeddings.get(c["id"])
+        if c_emb:
+            scored.append((c, _cosine_similarity(user_emb, c_emb)))
+        else:
+            scored.append((c, 0.0))
+
+    scored.sort(key=lambda x: x[1], reverse=True)
+    filtered = [c for c, _ in scored[:top_k]]
+    debug["candidates_prefiltered"] = len(filtered)
+    return filtered, debug
+
+
+def build_tribe_list(user: dict, all_attendees: List[dict]) -> dict:
+    """Build ranked tribe list using batch OpenAI matching with mock fallback.
+
+    Returns a dict with keys:
+      - tribe_list: sorted list of match dicts (each includes ai_source)
+      - debug: metadata about AI scoring status
+    """
     candidates = [a for a in all_attendees if a["id"] != user["id"]]
     mutual_ids = set(user.get("mutual_friend_ids", []))
 
-    # Try batch OpenAI call
+    openai_key_set = bool(os.getenv("OPENAI_API_KEY", ""))
+    api_call_ok = False
+    ai_scored = 0
+    mock_scored = 0
+
+    # Pre-filter candidates via embedding similarity
+    filtered_candidates, prefilter_debug = _prefilter_candidates(user, candidates)
+
+    # Try batch OpenAI call (only on pre-filtered subset)
     ai_lookup: dict = {}
     try:
-        ai_matches = _batch_match_openai(user, candidates)
+        ai_matches = _batch_match_openai(user, filtered_candidates)
         for m in ai_matches:
             ai_lookup[m["id"]] = m
+        if ai_matches:
+            api_call_ok = True
     except Exception as e:
         print(f"OpenAI batch match error: {e}")
 
@@ -154,8 +277,12 @@ def build_tribe_list(user: dict, all_attendees: List[dict]) -> List[dict]:
                 "match_type": ai.get("match_type", "peer"),
                 "background": ai.get("background", ""),
             }
+            ai_source = "gpt-4o"
+            ai_scored += 1
         else:
             match = _mock_match(user, attendee)
+            ai_source = "mock"
+            mock_scored += 1
 
         is_mutual = attendee["id"] in mutual_ids
         if is_mutual:
@@ -169,6 +296,19 @@ def build_tribe_list(user: dict, all_attendees: List[dict]) -> List[dict]:
             "match_type": match["match_type"],
             "background": match.get("background", ""),
             "source": "mutual_friend" if is_mutual else "interest_match",
+            "ai_source": ai_source,
         })
 
-    return sorted(results, key=lambda x: x["match_score"], reverse=True)
+    tribe_list = sorted(results, key=lambda x: x["match_score"], reverse=True)
+
+    return {
+        "tribe_list": tribe_list,
+        "debug": {
+            "openai_key_set": openai_key_set,
+            "api_call_ok": api_call_ok,
+            "ai_scored": ai_scored,
+            "mock_scored": mock_scored,
+            "model": "gpt-4o",
+            **prefilter_debug,
+        },
+    }
