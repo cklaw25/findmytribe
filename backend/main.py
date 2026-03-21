@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from matchmaker import build_tribe_list
 from dotenv import load_dotenv
@@ -114,8 +114,36 @@ def debug_match(user_id: str):
     }
 
 
+def _rerank_user(user_id: str):
+    """Background task: re-run build_tribe_list for a matched user and persist results."""
+    user = next((a for a in ATTENDEES if a["id"] == user_id), None)
+    if not user:
+        return
+    try:
+        result = build_tribe_list(user, ATTENDEES)
+        top8 = result["tribe_list"][:8]
+        sb = get_supabase()
+        if sb:
+            for match in top8:
+                row = {
+                    "user_id": user_id,
+                    "match_id": match["id"],
+                    "score": match["match_score"],
+                    "reason": match["match_reason"],
+                    "talking_points": match["talking_points"],
+                    "match_type": match["match_type"],
+                    "source": match["source"],
+                }
+                try:
+                    sb.table("tribe_list").upsert(row).execute()
+                except Exception:
+                    pass
+    except Exception as e:
+        print(f"Background re-rank error for {user_id}: {e}")
+
+
 @app.post("/location/{user_id}")
-def update_location(user_id: str, zone: str):
+def update_location(user_id: str, zone: str, background_tasks: BackgroundTasks):
     valid_zones = {"entrance", "main_hall", "workshop", "chill_zone", "outside"}
     if zone not in valid_zones:
         raise HTTPException(status_code=400, detail=f"Invalid zone. Must be one of: {valid_zones}")
@@ -126,6 +154,10 @@ def update_location(user_id: str, zone: str):
             sb.table("locations").upsert({"user_id": user_id, "zone": zone}).execute()
         except Exception as e:
             print(f"Supabase location upsert error: {e}")
+
+    # Re-rank if user has been matched before (uses cached embeddings — cheap)
+    if user_id in _matched_users:
+        background_tasks.add_task(_rerank_user, user_id)
 
     return {"status": "ok", "user_id": user_id, "zone": zone}
 

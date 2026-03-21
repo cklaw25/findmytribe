@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { use } from "react";
 import { useRouter } from "next/navigation";
 import { getTribeList, updateLocation, getAllLocations } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import { TribeMatch, Zone } from "@/types";
 import { ProfileCard } from "@/components/ProfileCard";
 import { EventMap } from "@/components/EventMap";
@@ -70,6 +71,13 @@ async function loadTribe() {
 
     useEffect(() => { loadTribe(); }, [userId]);
 
+  const tribeIdsRef = useRef(new Set<string>());
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    tribeIdsRef.current = new Set(tribeList.map((t) => t.id));
+  }, [tribeList]);
+
   useEffect(() => {
     async function fetchOnline() {
       try {
@@ -82,9 +90,38 @@ async function loadTribe() {
         // keep last known state
       }
     }
+
+    // Initial fetch for hydration
     fetchOnline();
-    const interval = setInterval(fetchOnline, 5000);
-    return () => clearInterval(interval);
+
+    // Supabase Realtime subscription for location changes
+    const channel = supabase
+      .channel("tribe-locations")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "locations" },
+        (payload) => {
+          const record = payload.new as { user_id: string; zone: string };
+          if (record?.user_id && record.zone && record.zone !== "unknown") {
+            setOnlineUserIds((prev) => new Set(prev).add(record.user_id));
+          }
+          // If a tribe member changed zone, debounce-refresh matches
+          if (record?.user_id && tribeIdsRef.current.has(record.user_id)) {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            debounceRef.current = setTimeout(loadTribe, 2000);
+          }
+        }
+      )
+      .subscribe();
+
+    // 30s fallback poll
+    const interval = setInterval(fetchOnline, 30000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, []);
 
   async function handleZoneChange(zone: string) {
