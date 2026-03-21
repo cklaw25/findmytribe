@@ -1,3 +1,5 @@
+import { sendConnectionRequest, fetchConnections, updateConnectionStatus } from "./api";
+
 export interface Invitation {
   id: string;
   name: string;
@@ -45,6 +47,9 @@ export function addInvitation(userId: string, inv: Invitation): void {
   if (invitations.some((i) => i.id === inv.id)) return;
   invitations.unshift(inv);
   localStorage.setItem(getKey(userId, "invitations"), JSON.stringify(invitations));
+
+  // Fire-and-forget API call to persist on backend
+  sendConnectionRequest(userId, inv.id).catch(() => {});
 }
 
 export function updateInvitationStatus(
@@ -53,14 +58,57 @@ export function updateInvitationStatus(
   status: "accepted" | "declined"
 ): void {
   const invitations = getInvitations(userId);
-  const updated = invitations.map((inv) =>
-    inv.id === matchId ? { ...inv, status } : inv
+  const inv = invitations.find((i) => i.id === matchId);
+  const updated = invitations.map((i) =>
+    i.id === matchId ? { ...i, status } : i
   );
   localStorage.setItem(getKey(userId, "invitations"), JSON.stringify(updated));
+
+  // Fire-and-forget API call
+  if (inv) {
+    const fromUser = inv.direction === "received" ? matchId : userId;
+    const toUser = inv.direction === "received" ? userId : matchId;
+    updateConnectionStatus(fromUser, toUser, status).catch(() => {});
+  }
 }
 
 export function getConnections(userId: string): Invitation[] {
   return getInvitations(userId).filter((inv) => inv.status === "accepted");
+}
+
+/**
+ * Sync localStorage with backend connections. Call on page load to hydrate.
+ * Returns the merged invitation list.
+ */
+export async function syncConnections(userId: string): Promise<Invitation[]> {
+  try {
+    const remote = await fetchConnections(userId);
+    const local = getInvitations(userId);
+    const localIds = new Set(local.map((i) => i.id));
+
+    for (const conn of remote) {
+      const peerId = conn.direction === "sent" ? conn.to_user : conn.from_user;
+      if (!localIds.has(peerId)) {
+        // New connection from backend not in localStorage
+        local.push({
+          id: peerId,
+          name: peerId,
+          role: "",
+          company: "",
+          initials: peerId.slice(0, 2).toUpperCase(),
+          status: conn.status,
+          direction: conn.direction,
+          timestamp: Date.now(),
+        });
+      }
+    }
+
+    localStorage.setItem(getKey(userId, "invitations"), JSON.stringify(local));
+    return local;
+  } catch {
+    // API unavailable — return localStorage data
+    return getInvitations(userId);
+  }
 }
 
 export function getChatMessages(userId: string, matchId: string): ChatMessage[] {
