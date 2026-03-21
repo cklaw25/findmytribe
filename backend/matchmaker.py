@@ -1,45 +1,114 @@
-import anthropic
 import json
+import math
 import os
 from typing import List
 
-client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-
-MATCH_PROMPT = """You are a professional networking matchmaker at a tech event.
-
-Analyze these two attendee profiles and assess how well they would connect professionally.
-
-PROFILE A (the user seeking connections):
-Name: {name_a}
-Role: {role_a} at {company_a}
-Bio: {bio_a}
-Interests: {interests_a}
-Goals at this event: {goals_a}
-
-PROFILE B (potential match):
-Name: {name_b}
-Role: {role_b} at {company_b}
-Bio: {bio_b}
-Interests: {interests_b}
-Goals at this event: {goals_b}
-
-Return ONLY a valid JSON object (no markdown, no code fences, no explanation):
-{{"score": <integer 0-100>, "reason": "<one sentence: why these two should meet>", "talking_points": ["<specific opener 1>", "<specific opener 2>", "<specific opener 3>"], "match_type": "<one of: collaborator|mentor|peer|founder_match|investor>"}}"""
+_openai_client = None
 
 
-def match_two_profiles(a: dict, b: dict) -> dict:
-    prompt = MATCH_PROMPT.format(
-        name_a=a["name"], role_a=a["role"], company_a=a.get("company", ""),
-        bio_a=a["bio"], interests_a=", ".join(a["interests"]), goals_a=a.get("goals", ""),
-        name_b=b["name"], role_b=b["role"], company_b=b.get("company", ""),
-        bio_b=b["bio"], interests_b=", ".join(b["interests"]), goals_b=b.get("goals", ""),
+def _get_client():
+    """Lazy-load OpenAI client (only when OPENAI_API_KEY is set)."""
+    global _openai_client
+    if _openai_client is None:
+        key = os.getenv("OPENAI_API_KEY", "")
+        if key:
+            from openai import OpenAI
+            _openai_client = OpenAI(api_key=key)
+    return _openai_client
+
+
+SYSTEM_PROMPT = """You are a world-class professional networking matchmaker at a live tech event.
+
+You will receive a USER profile and a list of CANDIDATE profiles. Score every candidate on how valuable a conversation with the user would be.
+
+## Scoring rubric (adapt weights dynamically based on the user's goals and background)
+
+1. **Interest overlap** — shared topics in bio, skills, interests
+2. **Goal alignment** — complementary event goals (e.g. "find co-founder" + "looking to join a startup")
+3. **Social graph** — mutual connections signal trust and warm-intro potential
+4. **Past event overlap** — shared communities indicate aligned worlds
+5. **Role complementarity** — complementary roles score higher than identical ones (e.g. designer + engineer > engineer + engineer)
+
+### Adaptive weighting
+- If the user wants to "find a co-founder" → weight goal alignment and role complementarity heavily
+- If the user is a student or early-career → weight mentor potential and learning opportunities
+- If the user is an investor → weight founder potential and traction signals
+- Otherwise balance all dimensions roughly equally
+
+## Match types
+Assign exactly one: collaborator, mentor, peer, founder_match, investor
+
+## Output format
+Return a JSON object with a single key "matches" containing an array. Each element:
+{
+  "id": "<candidate id>",
+  "score": <integer 0-100>,
+  "reason": "<one sentence: why these two should meet>",
+  "talking_points": ["<specific opener 1>", "<specific opener 2>", "<specific opener 3>"],
+  "match_type": "<collaborator|mentor|peer|founder_match|investor>",
+  "background": "<2-3 sentence paragraph about this candidate, written for the user — highlight what makes them interesting and relevant>"
+}
+
+Return ONLY valid JSON. No markdown, no code fences, no explanation outside the JSON."""
+
+
+def _format_profile(p: dict) -> str:
+    """Format a single profile for inclusion in the prompt."""
+    parts = [
+        f"ID: {p['id']}",
+        f"Name: {p['name']}",
+        f"Role: {p['role']} at {p.get('company', 'N/A')}",
+        f"Bio: {p['bio']}",
+        f"Interests: {', '.join(p.get('interests', []))}",
+        f"Goals: {p.get('goals', 'N/A')}",
+    ]
+    if p.get("past_events"):
+        parts.append(f"Past events: {', '.join(p['past_events'])}")
+    if p.get("mutual_friend_ids"):
+        parts.append(f"Mutual connections: {len(p['mutual_friend_ids'])}")
+    return "\n".join(parts)
+
+
+def _batch_match_openai(user: dict, candidates: List[dict]) -> List[dict]:
+    """Single GPT-4o call that scores all candidates at once."""
+    client = _get_client()
+    if client is None:
+        return []
+
+    candidate_blocks = []
+    for i, c in enumerate(candidates, 1):
+        candidate_blocks.append(f"### Candidate {i}\n{_format_profile(c)}")
+
+    user_message = (
+        f"## USER PROFILE\n{_format_profile(user)}\n\n"
+        f"## CANDIDATES ({len(candidates)} people)\n\n"
+        + "\n\n".join(candidate_blocks)
     )
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=400,
-        messages=[{"role": "user", "content": prompt}],
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_message},
+        ],
+        response_format={"type": "json_object"},
+        max_tokens=4096,
+        temperature=0.7,
+        timeout=30,
     )
-    return json.loads(response.content[0].text)
+
+    data = json.loads(response.choices[0].message.content)
+    return data.get("matches", [])
+
+
+def normalize_score(raw: float, min_out: float = 35, max_out: float = 95, steepness: float = 0.08) -> int:
+    """Sigmoid compression to prevent extreme scores.
+
+    Maps raw 0-100 → bounded min_out-max_out range with smooth falloff.
+    """
+    midpoint = 50
+    sigmoid = 1 / (1 + math.exp(-steepness * (raw - midpoint)))
+    return int(min_out + sigmoid * (max_out - min_out))
 
 
 def _mock_match(a: dict, b: dict) -> dict:
@@ -56,21 +125,36 @@ def _mock_match(a: dict, b: dict) -> dict:
             "What's the most surprising thing you've learned today?",
         ],
         "match_type": "peer",
+        "background": f"{b['name']} works as {b['role']} at {b.get('company', 'their company')}. They're interested in {', '.join(b.get('interests', ['technology'])[:3])}.",
     }
 
 
 def build_tribe_list(user: dict, all_attendees: List[dict]) -> List[dict]:
-    use_ai = bool(os.getenv("ANTHROPIC_API_KEY"))
-    results = []
+    """Build ranked tribe list using batch OpenAI matching with mock fallback."""
+    candidates = [a for a in all_attendees if a["id"] != user["id"]]
     mutual_ids = set(user.get("mutual_friend_ids", []))
 
-    for attendee in all_attendees:
-        if attendee["id"] == user["id"]:
-            continue
-        try:
-            match = match_two_profiles(user, attendee) if use_ai else _mock_match(user, attendee)
-        except Exception as e:
-            print(f"Match error for {attendee['id']}: {e}")
+    # Try batch OpenAI call
+    ai_lookup: dict = {}
+    try:
+        ai_matches = _batch_match_openai(user, candidates)
+        for m in ai_matches:
+            ai_lookup[m["id"]] = m
+    except Exception as e:
+        print(f"OpenAI batch match error: {e}")
+
+    results = []
+    for attendee in candidates:
+        ai = ai_lookup.get(attendee["id"])
+        if ai:
+            match = {
+                "score": normalize_score(ai["score"]),
+                "reason": ai["reason"],
+                "talking_points": ai.get("talking_points", []),
+                "match_type": ai.get("match_type", "peer"),
+                "background": ai.get("background", ""),
+            }
+        else:
             match = _mock_match(user, attendee)
 
         is_mutual = attendee["id"] in mutual_ids
@@ -83,6 +167,7 @@ def build_tribe_list(user: dict, all_attendees: List[dict]) -> List[dict]:
             "match_reason": match["reason"],
             "talking_points": match["talking_points"],
             "match_type": match["match_type"],
+            "background": match.get("background", ""),
             "source": "mutual_friend" if is_mutual else "interest_match",
         })
 
