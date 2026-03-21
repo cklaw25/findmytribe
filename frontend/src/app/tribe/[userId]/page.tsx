@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { use } from "react";
+import { useRouter } from "next/navigation";
 import { getTribeList, updateLocation, getAllLocations } from "@/lib/api";
 import { TribeMatch, Zone } from "@/types";
 import { ProfileCard } from "@/components/ProfileCard";
@@ -20,7 +21,6 @@ const LOADING_STEPS = [
   "Tribe list ready.",
 ];
 
-// Derive a display name from the user ID (falls back gracefully)
 const USER_NAMES: Record<string, string> = {
   usr_001: "Aisha",
   usr_002: "James",
@@ -31,6 +31,7 @@ const USER_NAMES: Record<string, string> = {
 
 export default function TribePage({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = use(params);
+  const router = useRouter();
   const [tribeList, setTribeList] = useState<TribeMatch[]>([]);
   const [fetching, setFetching] = useState(true);
   const [loadingDone, setLoadingDone] = useState(false);
@@ -43,13 +44,11 @@ export default function TribePage({ params }: { params: Promise<{ userId: string
 
   const firstName = USER_NAMES[userId] ?? "Your";
 
-  // Fetch tribe list on mount
   useEffect(() => {
     async function load() {
       try {
         const data = await getTribeList(userId);
         setTribeList(data.tribe_list);
-        // Surface an alert for the top match if available
         if (data.tribe_list.length > 0) {
           const top = data.tribe_list[0];
           setAlert({
@@ -66,7 +65,6 @@ export default function TribePage({ params }: { params: Promise<{ userId: string
     load();
   }, [userId]);
 
-  // Poll locations for online status
   useEffect(() => {
     async function fetchOnline() {
       try {
@@ -96,7 +94,6 @@ export default function TribePage({ params }: { params: Promise<{ userId: string
     setView("map");
   }
 
-  // Show loading animation until both fetch AND animation are done
   const showLoading = fetching || !loadingDone;
 
   if (showLoading) {
@@ -157,11 +154,12 @@ export default function TribePage({ params }: { params: Promise<{ userId: string
             {tribeList.map((match) => (
               <div
                 key={match.id}
-                onClick={() => setExpandedId(expandedId === match.id ? null : match.id)}
+                onClick={() => router.push(`/tribe/${userId}/profile/${match.id}`)}
+                style={{ cursor: "pointer" }}
               >
                 <ProfileCard
                   profile={match}
-                  onViewMap={() => handleViewOnMap(match)}
+                  onViewMap={(e) => { e.stopPropagation(); handleViewOnMap(match); }}
                   expanded={expandedId === match.id}
                   isOnline={onlineUserIds.has(match.id)}
                 />
