@@ -4,6 +4,7 @@ import { TribeMatch } from "@/types";
 interface ProfileCardProps {
   profile: TribeMatch;
   onViewMap?: () => void;
+  onConnect?: (e: React.MouseEvent) => void;
   expanded?: boolean;
   isOnline?: boolean;
 }
@@ -61,7 +62,7 @@ function getTypeBadge(matchType: string) {
   return null;
 }
 
-export function ProfileCard({ profile, onViewMap, expanded = false, isOnline }: ProfileCardProps) {
+export function ProfileCard({ profile, onViewMap, onConnect, expanded = false, isOnline }: ProfileCardProps) {
   return (
     <div style={{
       background: "var(--card)",
@@ -125,7 +126,7 @@ export function ProfileCard({ profile, onViewMap, expanded = false, isOnline }: 
           </button>
         )}
         <button
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); onConnect?.(e); }}
           style={{
             padding: "7px 15px", borderRadius: 100, border: "none",
             background: "var(--green)", color: "#fff", cursor: "pointer",

@@ -68,13 +68,104 @@ export default function HostDashboard() {
     );
   }
 
-  if (!data) return null;
+  if (!data) return (
+    <main style={{ background: "var(--cream)", minHeight: "100dvh" }}>
+      <TopBar title="Host Dashboard" subtitle="Encode Club AI London 2026" onBack={() => router.push("/")} right={<LiveDot />} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60dvh" }}>
+        <div style={{ textAlign: "center", padding: "0 32px" }}>
+          <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 18, marginBottom: 6 }}>
+            Something went wrong
+          </div>
+          <div style={{ fontSize: 14, color: "var(--text-2)", fontWeight: 300, marginBottom: 16, lineHeight: 1.5 }}>
+            Couldn't load the dashboard. Check your connection and try again.
+          </div>
+          <button
+            onClick={() => { setLoading(true); load(); }}
+            style={{
+              padding: "10px 28px", borderRadius: 100, border: "none",
+              background: "var(--green)", color: "#fff", cursor: "pointer",
+              fontFamily: "var(--font-geist-sans), sans-serif", fontSize: 14, fontWeight: 600,
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    </main>
+  );
 
   const zones = Object.entries(data.zone_counts).sort((a, b) => b[1] - a[1]);
   const hottestZone = zones[0];
   const isolatedAttendees = data.attendees.filter(
     (a) => a.zone && a.zone !== "unknown" && data.zone_counts[a.zone] === 1
   );
+
+  const GRAPH_NODES = [
+    { id: "usr_001", name: "Aisha P.", initials: "AP" },
+    { id: "usr_002", name: "James O.", initials: "JO" },
+    { id: "usr_003", name: "Sofia M.", initials: "SM" },
+    { id: "usr_004", name: "Nina C.", initials: "NC" },
+    { id: "usr_005", name: "Tariq A.", initials: "TA" },
+    { id: "usr_006", name: "Luca F.", initials: "LF" },
+    { id: "usr_007", name: "Yuki T.", initials: "YT" },
+    { id: "usr_008", name: "Priya K.", initials: "PK" },
+    { id: "usr_009", name: "Ben W.", initials: "BW" },
+    { id: "usr_015", name: "Omar H.", initials: "OH" },
+  ];
+
+  const GRAPH_EDGES: [number, number][] = [
+    [0, 1], [0, 2], [0, 5], [1, 3], [1, 6], [2, 4], [2, 7],
+    [3, 5], [4, 8], [5, 6], [6, 9], [7, 8], [7, 9], [3, 7],
+  ];
+
+  function SocialGraph() {
+    const cx = 160, cy = 140, r = 110;
+    const positions = GRAPH_NODES.map((_, i) => {
+      const angle = (i / GRAPH_NODES.length) * Math.PI * 2 - Math.PI / 2;
+      return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+    });
+
+    return (
+      <svg viewBox="0 0 320 280" style={{ width: "100%", height: "auto" }}>
+        {GRAPH_EDGES.map(([a, b], i) => (
+          <line key={i}
+            x1={positions[a].x} y1={positions[a].y}
+            x2={positions[b].x} y2={positions[b].y}
+            stroke="var(--card-border)" strokeWidth="1.5" opacity="0.7"
+          />
+        ))}
+        {GRAPH_NODES.map((node, i) => {
+          const pos = positions[i];
+          const connCount = GRAPH_EDGES.filter(([a, b]) => a === i || b === i).length;
+          const isHub = connCount >= 3;
+          return (
+            <g key={node.id}>
+              <circle cx={pos.x} cy={pos.y} r={isHub ? 22 : 18}
+                fill={isHub ? "var(--green)" : "var(--cream)"}
+                stroke={isHub ? "var(--green)" : "var(--card-border)"}
+                strokeWidth="1.5"
+              />
+              <text x={pos.x} y={pos.y - 3}
+                textAnchor="middle" dominantBaseline="central"
+                fontSize="10" fontWeight="600"
+                fill={isHub ? "#fff" : "var(--text-2)"}
+                fontFamily="var(--font-instrument-serif), serif"
+              >
+                {node.initials}
+              </text>
+              <text x={pos.x} y={pos.y + 10}
+                textAnchor="middle" dominantBaseline="central"
+                fontSize="7" fontWeight="400"
+                fill={isHub ? "rgba(255,255,255,.7)" : "var(--text-3)"}
+              >
+                {connCount}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    );
+  }
 
   return (
     <main style={{ background: "var(--cream)", minHeight: "100dvh", paddingBottom: 32 }}>
@@ -141,6 +232,14 @@ export default function HostDashboard() {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Social graph */}
+      <div style={{ padding: "4px 16px 14px" }}>
+        <div style={{ background: "var(--card)", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", padding: 18 }}>
+          <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 18, marginBottom: 14 }}>Social graph</div>
+          <SocialGraph />
         </div>
       </div>
 
