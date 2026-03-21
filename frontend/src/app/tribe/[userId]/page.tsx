@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { use } from "react";
-import { getTribeList, updateLocation } from "@/lib/api";
+import { getTribeList, updateLocation, getAllLocations } from "@/lib/api";
 import { TribeMatch, Zone } from "@/types";
 import { ProfileCard } from "@/components/ProfileCard";
 import { EventMap } from "@/components/EventMap";
@@ -39,6 +39,7 @@ export default function TribePage({ params }: { params: Promise<{ userId: string
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [currentZone, setCurrentZone] = useState<Zone>("entrance");
   const [alert, setAlert] = useState<{ title: string; body: string } | null>(null);
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
 
   const firstName = USER_NAMES[userId] ?? "Your";
 
@@ -64,6 +65,24 @@ export default function TribePage({ params }: { params: Promise<{ userId: string
     }
     load();
   }, [userId]);
+
+  // Poll locations for online status
+  useEffect(() => {
+    async function fetchOnline() {
+      try {
+        const locs = await getAllLocations();
+        const ids = new Set<string>(
+          locs.filter((l: { zone?: string }) => l.zone && l.zone !== "unknown").map((l: { user_id: string }) => l.user_id)
+        );
+        setOnlineUserIds(ids);
+      } catch {
+        // keep last known state
+      }
+    }
+    fetchOnline();
+    const interval = setInterval(fetchOnline, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   async function handleZoneChange(zone: string) {
     setCurrentZone(zone as Zone);
@@ -144,6 +163,7 @@ export default function TribePage({ params }: { params: Promise<{ userId: string
                   profile={match}
                   onViewMap={() => handleViewOnMap(match)}
                   expanded={expandedId === match.id}
+                  isOnline={onlineUserIds.has(match.id)}
                 />
               </div>
             ))}
@@ -164,7 +184,7 @@ export default function TribePage({ params }: { params: Promise<{ userId: string
               {tribeList
                 .filter((p) => p.id === highlightId)
                 .map((p) => (
-                  <ProfileCard key={p.id} profile={p} expanded />
+                  <ProfileCard key={p.id} profile={p} expanded isOnline={onlineUserIds.has(p.id)} />
                 ))}
             </div>
           )}

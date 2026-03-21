@@ -5,6 +5,7 @@ interface ProfileCardProps {
   profile: TribeMatch;
   onViewMap?: () => void;
   expanded?: boolean;
+  isOnline?: boolean;
 }
 
 function getInitials(name: string) {
@@ -60,7 +61,7 @@ function getTypeBadge(matchType: string) {
   return null;
 }
 
-export function ProfileCard({ profile, onViewMap, expanded = false }: ProfileCardProps) {
+export function ProfileCard({ profile, onViewMap, expanded = false, isOnline }: ProfileCardProps) {
   return (
     <div style={{
       background: "var(--card)",
@@ -69,14 +70,23 @@ export function ProfileCard({ profile, onViewMap, expanded = false }: ProfileCar
     }}>
       {/* Header row */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-        <div style={{
-          width: 46, height: 46, borderRadius: "50%", flexShrink: 0,
-          background: "var(--cream)", border: "1px solid var(--card-border)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontFamily: "var(--font-instrument-serif), serif", fontSize: 17,
-          color: "var(--text-2)",
-        }}>
-          {getInitials(profile.name)}
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <div style={{
+            width: 46, height: 46, borderRadius: "50%",
+            background: "var(--cream)", border: "1px solid var(--card-border)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontFamily: "var(--font-instrument-serif), serif", fontSize: 17,
+            color: "var(--text-2)",
+          }}>
+            {getInitials(profile.name)}
+          </div>
+          {isOnline && (
+            <div style={{
+              position: "absolute", bottom: 0, right: 0,
+              width: 11, height: 11, borderRadius: "50%",
+              background: "var(--green)", border: "2px solid var(--card)",
+            }} />
+          )}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 600, fontSize: 15, lineHeight: 1.2 }}>{profile.name}</div>

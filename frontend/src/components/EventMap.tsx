@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TribeMatch, Zone } from "@/types";
 
 // Zone regions (matching HTML prototype geometry)
@@ -174,6 +174,47 @@ export function EventMap({ tribeList, highlightId, selfZone = "entrance" }: Even
           Others
         </div>
       </div>
+
+      {/* Zone occupancy chips */}
+      <ZoneChips locations={locations} />
+    </div>
+  );
+}
+
+function ZoneChips({ locations }: { locations: Record<string, Zone> }) {
+  const zoneCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const zone of Object.values(locations)) {
+      counts[zone] = (counts[zone] || 0) + 1;
+    }
+    return counts;
+  }, [locations]);
+
+  return (
+    <div style={{
+      display: "flex", gap: 8, padding: "4px 16px 14px",
+      overflowX: "auto", WebkitOverflowScrolling: "touch",
+    }}>
+      {ZONE_REGIONS.map((zone) => (
+        <div key={zone.key} style={{
+          background: "var(--card)", border: "1px solid var(--card-border)",
+          borderRadius: "var(--radius-sm)", padding: "10px 14px",
+          minWidth: 80, textAlign: "center", flexShrink: 0,
+        }}>
+          <div style={{
+            fontSize: 10, fontWeight: 500, textTransform: "uppercase",
+            letterSpacing: ".06em", color: "var(--text-3)",
+          }}>
+            {zone.label}
+          </div>
+          <div style={{
+            fontFamily: "var(--font-instrument-serif), serif",
+            fontSize: 26, lineHeight: 1.2, marginTop: 2,
+          }}>
+            {zoneCounts[zone.key] || 0}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

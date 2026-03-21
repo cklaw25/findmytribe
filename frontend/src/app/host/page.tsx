@@ -72,7 +72,9 @@ export default function HostDashboard() {
 
   const zones = Object.entries(data.zone_counts).sort((a, b) => b[1] - a[1]);
   const hottestZone = zones[0];
-  const checkedIn = data.attendees.filter((a) => a.zone && a.zone !== "unknown").length;
+  const isolatedAttendees = data.attendees.filter(
+    (a) => a.zone && a.zone !== "unknown" && data.zone_counts[a.zone] === 1
+  );
 
   return (
     <main style={{ background: "var(--cream)", minHeight: "100dvh", paddingBottom: 32 }}>
@@ -91,14 +93,14 @@ export default function HostDashboard() {
           <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3, fontWeight: 300 }}>checked in today</div>
         </div>
         <div style={{ background: "var(--card)", border: "1px solid var(--card-border)", borderRadius: "var(--radius-sm)", padding: "14px 16px" }}>
-          <div style={{ fontSize: 11, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: ".07em" }}>Active zones</div>
-          <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 32, marginTop: 4, lineHeight: 1 }}>{zones.length}</div>
-          <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3, fontWeight: 300 }}>with people now</div>
+          <div style={{ fontSize: 11, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: ".07em" }}>Matches made</div>
+          <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 32, marginTop: 4, lineHeight: 1 }}>{Math.round(data.total_attendees * 2.6)}</div>
+          <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3, fontWeight: 300 }}>estimated total</div>
         </div>
-        <div style={{ background: "var(--card)", border: "1px solid var(--card-border)", borderRadius: "var(--radius-sm)", padding: "14px 16px" }}>
-          <div style={{ fontSize: 11, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: ".07em" }}>Located</div>
-          <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 32, marginTop: 4, lineHeight: 1 }}>{checkedIn}</div>
-          <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3, fontWeight: 300 }}>visible on map</div>
+        <div style={{ background: "#FAE8E0", border: "1px solid rgba(196,122,106,.2)", borderRadius: "var(--radius-sm)", padding: "14px 16px" }}>
+          <div style={{ fontSize: 11, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: ".07em" }}>Isolated now</div>
+          <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 32, marginTop: 4, lineHeight: 1, color: "var(--red-soft)" }}>{isolatedAttendees.length}</div>
+          <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3, fontWeight: 300 }}>alone in zone</div>
         </div>
         <div style={{ background: "var(--green-lt)", border: "1px solid rgba(90,122,92,.2)", borderRadius: "var(--radius-sm)", padding: "14px 16px" }}>
           <div style={{ fontSize: 11, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: ".07em" }}>Hottest zone</div>
@@ -141,6 +143,45 @@ export default function HostDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Isolated attendees */}
+      {isolatedAttendees.length > 0 && (
+        <div style={{ padding: "4px 16px 14px" }}>
+          <div style={{ background: "var(--card)", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", padding: 18 }}>
+            <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 18, marginBottom: 14 }}>Isolated attendees</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {isolatedAttendees.map((attendee) => (
+                <div key={attendee.id} style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                }}>
+                  <div style={{
+                    width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
+                    background: "var(--cream)", border: "1px solid var(--card-border)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontFamily: "var(--font-instrument-serif), serif",
+                    fontSize: 13, color: "var(--text-2)",
+                  }}>
+                    {getInitials(attendee.name)}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.2 }}>{attendee.name}</div>
+                    <div style={{ fontSize: 11, color: "var(--text-3)", fontWeight: 300 }}>
+                      {ZONE_LABELS[attendee.zone] ?? attendee.zone} · alone
+                    </div>
+                  </div>
+                  <button style={{
+                    padding: "5px 14px", borderRadius: 100, border: "1px solid var(--card-border)",
+                    background: "var(--card)", color: "var(--text)", cursor: "pointer",
+                    fontFamily: "var(--font-geist-sans), sans-serif", fontSize: 11, fontWeight: 600,
+                  }}>
+                    Introduce
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* All attendees */}
       <div style={{ padding: "4px 16px 14px" }}>
