@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getEventOverview } from "@/lib/api";
 import { TopBar } from "@/components/TopBar";
 import { ZONE_LABELS } from "@/components/ZoneScroll";
+import { supabase } from "@/lib/supabase";
 
 interface AttendeeWithZone {
   id: string;
@@ -48,10 +49,32 @@ export default function HostDashboard() {
     }
   }
 
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     load();
-    const interval = setInterval(load, 10000);
-    return () => clearInterval(interval);
+
+    // Supabase Realtime: debounce 500ms then refetch overview
+    const channel = supabase
+      .channel("host-locations")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "locations" },
+        () => {
+          if (debounceRef.current) clearTimeout(debounceRef.current);
+          debounceRef.current = setTimeout(load, 500);
+        }
+      )
+      .subscribe();
+
+    // 30s fallback poll
+    const interval = setInterval(load, 30000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, []);
 
   if (loading) {

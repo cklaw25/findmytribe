@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { TribeMatch, Zone } from "@/types";
+import { supabase } from "@/lib/supabase";
 
 // Zone regions (matching HTML prototype geometry)
 const ZONE_REGIONS: { key: string; label: string; style: React.CSSProperties }[] = [
@@ -54,9 +55,31 @@ export function EventMap({ tribeList, highlightId, selfZone = "entrance" }: Even
       }
     }
 
+    // Initial fetch for hydration
     fetchLocations();
-    const interval = setInterval(fetchLocations, 5000);
-    return () => clearInterval(interval);
+
+    // Supabase Realtime subscription
+    const channel = supabase
+      .channel("map-locations")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "locations" },
+        (payload) => {
+          const record = payload.new as { user_id: string; zone: string };
+          if (record?.user_id) {
+            setLocations((prev) => ({ ...prev, [record.user_id]: record.zone as Zone }));
+          }
+        }
+      )
+      .subscribe();
+
+    // 30s fallback poll in case realtime connection drops
+    const interval = setInterval(fetchLocations, 30000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
   }, []);
 
   const tribeIds = new Set(tribeList.map((p) => p.id));
