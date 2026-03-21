@@ -133,7 +133,8 @@ async function loadTribe() {
     <main style={{ background: "var(--cream)", minHeight: "100dvh", paddingBottom: 88 }}>
       <TopBar
         title={`${firstName}'s Tribe`}
-        subtitle="AI matched · live"
+        subtitle="Encode Club AI London 2026"
+        onBack={view === "map" ? () => setView("tribe") : undefined}
         right={
           <div style={{
             fontSize: 11.5, fontWeight: 500, padding: "5px 12px",
@@ -250,7 +251,7 @@ async function loadTribe() {
             {tribeList.map((match) => (
               <div
                 key={match.id}
-                onClick={() => router.push(`/tribe/${userId}/profile/${match.id}`)}
+                onClick={() => setExpandedId(expandedId === match.id ? null : match.id)}
                 style={{ cursor: "pointer" }}
               >
                 <ProfileCard
