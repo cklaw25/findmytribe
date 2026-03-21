@@ -5,9 +5,12 @@ from dotenv import load_dotenv
 import json
 import os
 import asyncio
+from pathlib import Path
 
-load_dotenv(".env.local")
-load_dotenv()  # .env as fallback (won't override existing vars)
+# Load env relative to this file's location, not CWD
+_here = Path(__file__).resolve().parent
+load_dotenv(_here / ".env.local")
+load_dotenv(_here / ".env")  # fallback
 
 # Lazy-load Supabase so the app still boots without keys during dev
 _supabase = None
