@@ -24,8 +24,9 @@ export function ZoneScroll({ activeZone, onChange }: ZoneScrollProps) {
           key={key}
           onClick={() => onChange(key)}
           style={{
-            flexShrink: 0, padding: "7px 16px", borderRadius: 100,
-            fontSize: 12.5, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap",
+            flexShrink: 0, padding: "9px 18px", borderRadius: 100,
+            fontSize: 13, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap",
+            minHeight: 44,
             border: `1.5px solid ${activeZone === key ? "var(--text)" : "var(--card-border)"}`,
             background: activeZone === key ? "var(--text)" : "var(--card)",
             color: activeZone === key ? "var(--cream)" : "var(--text-2)",

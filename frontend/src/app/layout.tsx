@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import { ZoneAlertProvider } from "@/contexts/ZoneAlertContext";
 import "./globals.css";
@@ -23,6 +23,24 @@ const instrumentSerif = Instrument_Serif({
 export const metadata: Metadata = {
   title: "FindMyTribe",
   description: "Find your people. Right now. In this room.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "FindMyTribe",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#5A7A5C",
 };
 
 export default function RootLayout({

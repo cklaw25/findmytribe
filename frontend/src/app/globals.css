@@ -26,12 +26,46 @@
   --font-serif: var(--font-instrument-serif);
 }
 
+html {
+  /* Prevent iOS font size inflation on rotate */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   background: var(--cream);
   color: var(--text);
   font-family: var(--font-geist-sans), sans-serif;
   font-size: 15px;
   overflow-x: hidden;
+  /* Smooth momentum scrolling on iOS */
+  -webkit-overflow-scrolling: touch;
+  /* Prevent overscroll bounce revealing white bg */
+  overscroll-behavior: none;
+}
+
+/* Remove tap highlight on mobile */
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+/* Ensure buttons/interactive elements have min touch target */
+button {
+  touch-action: manipulation;
+  min-height: 44px;
+}
+
+/* Scrollable containers on iOS */
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.scroll-x::-webkit-scrollbar { display: none; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 @keyframes fadeUp {
@@ -55,9 +89,9 @@ body {
 }
 
 @keyframes selfring {
-  0%   { box-shadow: 0 0 0 0   rgba(28,26,23,.3), 0 2px 10px rgba(0,0,0,.14); }
-  70%  { box-shadow: 0 0 0 9px rgba(28,26,23,0),  0 2px 10px rgba(0,0,0,.14); }
-  100% { box-shadow: 0 0 0 0   rgba(28,26,23,0),  0 2px 10px rgba(0,0,0,.14); }
+  0%   { box-shadow: 0 0 0 0    rgba(232,93,74,.5),  0 2px 10px rgba(0,0,0,.14); }
+  70%  { box-shadow: 0 0 0 11px rgba(232,93,74,0),   0 2px 10px rgba(0,0,0,.14); }
+  100% { box-shadow: 0 0 0 0    rgba(232,93,74,0),   0 2px 10px rgba(0,0,0,.14); }
 }
 
 @keyframes highlightring {
