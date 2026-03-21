@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getEventOverview } from "@/lib/api";
-import { Users, MapPin, Activity } from "lucide-react";
+import { TopBar } from "@/components/TopBar";
+import { ZONE_LABELS } from "@/components/ZoneScroll";
 
 interface AttendeeWithZone {
   id: string;
@@ -17,16 +19,21 @@ interface EventOverview {
   attendees: AttendeeWithZone[];
 }
 
-const ZONE_COLORS: Record<string, string> = {
-  main_hall:  "bg-violet-100 text-violet-700",
-  workshop:   "bg-blue-100 text-blue-700",
-  chill_zone: "bg-green-100 text-green-700",
-  entrance:   "bg-amber-100 text-amber-700",
-  outside:    "bg-gray-100 text-gray-600",
-  unknown:    "bg-gray-50 text-gray-400",
-};
+function getInitials(name: string) {
+  return name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+}
+
+function LiveDot() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+      <div style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--green)", animation: "blink 1.6s ease-in-out infinite" }} />
+      <span style={{ fontSize: 11.5, fontWeight: 500, color: "var(--green)" }}>Live</span>
+    </div>
+  );
+}
 
 export default function HostDashboard() {
+  const router = useRouter();
   const [data, setData] = useState<EventOverview | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -43,99 +50,131 @@ export default function HostDashboard() {
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 10000); // refresh every 10s
+    const interval = setInterval(load, 10000);
     return () => clearInterval(interval);
   }, []);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center text-white">
-          <Activity size={36} className="animate-pulse mx-auto mb-3" />
-          <p className="font-semibold">Loading event dashboard...</p>
+      <main style={{ background: "var(--cream)", minHeight: "100dvh" }}>
+        <TopBar title="Host Dashboard" subtitle="Encode Club AI London 2026" right={<LiveDot />} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60dvh" }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ width: 40, height: 40, borderRadius: "50%", border: "2.5px solid var(--card-border)", borderTopColor: "var(--green)", animation: "spin .9s linear infinite", margin: "0 auto 16px" }} />
+            <div style={{ fontSize: 14, color: "var(--text-2)", fontWeight: 300 }}>Loading dashboard…</div>
+          </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   if (!data) return null;
 
   const zones = Object.entries(data.zone_counts).sort((a, b) => b[1] - a[1]);
+  const hottestZone = zones[0];
+  const checkedIn = data.attendees.filter((a) => a.zone && a.zone !== "unknown").length;
 
   return (
-    <main className="min-h-screen bg-gray-900 text-white p-6">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <p className="text-gray-400 text-xs font-medium uppercase tracking-wide">Host Dashboard</p>
-            <h1 className="text-2xl font-bold mt-0.5">🔮 FindMyTribe — Event OS</h1>
-            <p className="text-gray-400 text-sm">Encode Club AI London 2026 · Live</p>
+    <main style={{ background: "var(--cream)", minHeight: "100dvh", paddingBottom: 32 }}>
+      <TopBar
+        title="Host Dashboard"
+        subtitle="Encode Club AI London 2026"
+        onBack={() => router.push("/")}
+        right={<LiveDot />}
+      />
+
+      {/* Stats grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "16px 16px 10px" }}>
+        <div style={{ background: "var(--card)", border: "1px solid var(--card-border)", borderRadius: "var(--radius-sm)", padding: "14px 16px" }}>
+          <div style={{ fontSize: 11, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: ".07em" }}>Attendees</div>
+          <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 32, marginTop: 4, lineHeight: 1 }}>{data.total_attendees}</div>
+          <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3, fontWeight: 300 }}>checked in today</div>
+        </div>
+        <div style={{ background: "var(--card)", border: "1px solid var(--card-border)", borderRadius: "var(--radius-sm)", padding: "14px 16px" }}>
+          <div style={{ fontSize: 11, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: ".07em" }}>Active zones</div>
+          <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 32, marginTop: 4, lineHeight: 1 }}>{zones.length}</div>
+          <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3, fontWeight: 300 }}>with people now</div>
+        </div>
+        <div style={{ background: "var(--card)", border: "1px solid var(--card-border)", borderRadius: "var(--radius-sm)", padding: "14px 16px" }}>
+          <div style={{ fontSize: 11, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: ".07em" }}>Located</div>
+          <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 32, marginTop: 4, lineHeight: 1 }}>{checkedIn}</div>
+          <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3, fontWeight: 300 }}>visible on map</div>
+        </div>
+        <div style={{ background: "var(--green-lt)", border: "1px solid rgba(90,122,92,.2)", borderRadius: "var(--radius-sm)", padding: "14px 16px" }}>
+          <div style={{ fontSize: 11, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: ".07em" }}>Hottest zone</div>
+          <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 18, marginTop: 8, lineHeight: 1, color: "var(--green)" }}>
+            {hottestZone ? (ZONE_LABELS[hottestZone[0]] ?? hottestZone[0]) : "—"}
           </div>
-          <div className="flex items-center gap-2 bg-green-500/20 text-green-400 px-3 py-1.5 rounded-full text-xs font-semibold">
-            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            Live
+          <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3, fontWeight: 300 }}>
+            {hottestZone ? `${hottestZone[1]} people now` : ""}
           </div>
         </div>
+      </div>
 
-        {/* Stats row */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-gray-800 rounded-2xl p-4">
-            <Users size={20} className="text-violet-400 mb-2" />
-            <p className="text-2xl font-bold">{data.total_attendees}</p>
-            <p className="text-gray-400 text-xs">Total attendees</p>
-          </div>
-          <div className="bg-gray-800 rounded-2xl p-4">
-            <MapPin size={20} className="text-blue-400 mb-2" />
-            <p className="text-2xl font-bold">{zones.length}</p>
-            <p className="text-gray-400 text-xs">Active zones</p>
-          </div>
-          <div className="bg-gray-800 rounded-2xl p-4">
-            <Activity size={20} className="text-green-400 mb-2" />
-            <p className="text-2xl font-bold">
-              {data.attendees.filter(a => a.zone && a.zone !== "unknown").length}
-            </p>
-            <p className="text-gray-400 text-xs">Checked in</p>
-          </div>
-        </div>
-
-        {/* Zone heatmap */}
-        <div className="bg-gray-800 rounded-2xl p-5 mb-6">
-          <h2 className="text-sm font-semibold text-gray-300 mb-4">Zone Distribution</h2>
-          <div className="space-y-3">
+      {/* Zone heatmap */}
+      <div style={{ padding: "4px 16px 14px" }}>
+        <div style={{ background: "var(--card)", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", padding: 18 }}>
+          <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 18, marginBottom: 14 }}>Zone heatmap</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
             {zones.map(([zone, count]) => (
-              <div key={zone} className="flex items-center gap-3">
-                <span className="text-xs text-gray-400 w-24 capitalize">{zone.replace("_", " ")}</span>
-                <div className="flex-1 bg-gray-700 rounded-full h-2">
-                  <div
-                    className="bg-violet-500 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${(count / data.total_attendees) * 100}%` }}
-                  />
+              <div key={zone} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ fontSize: 12, color: "var(--text-2)", width: 74, flexShrink: 0 }}>
+                  {ZONE_LABELS[zone] ?? zone}
                 </div>
-                <span className="text-xs font-semibold text-gray-300 w-6 text-right">{count}</span>
+                <div style={{ flex: 1, height: 22, background: "var(--cream)", borderRadius: 5, overflow: "hidden", border: "1px solid var(--card-border)" }}>
+                  <div style={{
+                    height: "100%", borderRadius: 5, minWidth: 28,
+                    background: "linear-gradient(90deg,var(--green-mid),var(--green))",
+                    width: `${Math.round((count / data.total_attendees) * 100)}%`,
+                    display: "flex", alignItems: "center", justifyContent: "flex-end",
+                    paddingRight: 8, fontSize: 11, fontWeight: 600, color: "#fff",
+                    transition: "width 1.1s cubic-bezier(.22,1,.36,1)",
+                  }}>
+                    {count}
+                  </div>
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 500, width: 20, textAlign: "right", color: "var(--text-2)" }}>
+                  {count}
+                </div>
               </div>
             ))}
           </div>
         </div>
+      </div>
 
-        {/* Attendee grid */}
-        <div className="bg-gray-800 rounded-2xl p-5">
-          <h2 className="text-sm font-semibold text-gray-300 mb-4">All Attendees</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+      {/* All attendees */}
+      <div style={{ padding: "4px 16px 14px" }}>
+        <div style={{ background: "var(--card)", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", padding: 18 }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", paddingBottom: 12 }}>
+            <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 18 }}>All attendees</div>
+            <div style={{ fontSize: 11.5, fontWeight: 500, color: "var(--text-3)", background: "var(--cream)", border: "1px solid var(--card-border)", padding: "2px 10px", borderRadius: 100 }}>
+              {data.total_attendees} people
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             {data.attendees.map((attendee) => (
-              <div key={attendee.id} className="bg-gray-750 border border-gray-700 rounded-xl p-3">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                    {attendee.name[0]}
+              <div key={attendee.id} style={{
+                background: "var(--cream)", border: "1px solid var(--card-border)",
+                borderRadius: "var(--radius-sm)", padding: "11px 12px",
+                display: "flex", alignItems: "center", gap: 9,
+              }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
+                  background: "var(--card)", border: "1px solid var(--card-border)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontFamily: "var(--font-instrument-serif), serif",
+                  fontSize: 13, color: "var(--text-2)",
+                }}>
+                  {getInitials(attendee.name)}
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.2 }}>
+                    {attendee.name.split(" ")[0]} {attendee.name.split(" ")[1]?.[0]}.
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-white truncate">{attendee.name}</p>
-                    <p className="text-xs text-gray-400 truncate">{attendee.role}</p>
+                  <div style={{ fontSize: 11, color: "var(--text-3)", fontWeight: 300 }}>
+                    {ZONE_LABELS[attendee.zone] ?? attendee.zone ?? "Unknown"}
                   </div>
                 </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${ZONE_COLORS[attendee.zone] || ZONE_COLORS.unknown}`}>
-                  {(attendee.zone || "unknown").replace("_", " ")}
-                </span>
               </div>
             ))}
           </div>
