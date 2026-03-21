@@ -54,6 +54,20 @@ CREATE TABLE tribe_list (
 COMMENT ON TABLE tribe_list IS 'AI-generated match results — top tribe matches per attendee.';
 
 -- ============================================================
+-- 4. CONNECTIONS — connection requests between attendees
+-- ============================================================
+CREATE TABLE connections (
+    from_user   TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    to_user     TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (from_user, to_user)
+);
+
+COMMENT ON TABLE connections IS 'Connection requests between attendees — pending/accepted/declined.';
+
+-- ============================================================
 -- AUTO-UPDATE updated_at ON UPSERT
 -- ============================================================
 
@@ -70,6 +84,11 @@ CREATE TRIGGER trg_locations_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION set_updated_at();
 
+CREATE TRIGGER trg_connections_updated_at
+    BEFORE UPDATE ON connections
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at();
+
 -- ============================================================
 -- INDEXES
 -- ============================================================
@@ -83,13 +102,17 @@ CREATE INDEX idx_tribe_list_match_id ON tribe_list (match_id);
 -- Filter locations by zone (useful for host dashboard zone counts)
 CREATE INDEX idx_locations_zone ON locations (zone);
 
+-- Connections: look up by either party
+CREATE INDEX idx_connections_to_user ON connections (to_user);
+
 -- ============================================================
 -- ROW LEVEL SECURITY
 -- ============================================================
 
-ALTER TABLE profiles   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE locations  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tribe_list ENABLE ROW LEVEL SECURITY;
+ALTER TABLE profiles    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE locations   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tribe_list  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE connections ENABLE ROW LEVEL SECURITY;
 
 -- Permissive read policies — all authenticated (and anon) users can read
 CREATE POLICY "Allow public read on profiles"
@@ -131,6 +154,19 @@ CREATE POLICY "Allow insert on tribe_list"
 
 CREATE POLICY "Allow update on tribe_list"
     ON tribe_list FOR UPDATE
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Allow public read on connections"
+    ON connections FOR SELECT
+    USING (true);
+
+CREATE POLICY "Allow insert on connections"
+    ON connections FOR INSERT
+    WITH CHECK (true);
+
+CREATE POLICY "Allow update on connections"
+    ON connections FOR UPDATE
     USING (true)
     WITH CHECK (true);
 

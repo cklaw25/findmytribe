@@ -189,3 +189,104 @@ def event_overview():
         "zone_counts": zone_counts,
         "attendees": attendees_with_zones,
     }
+
+
+# ============================================================
+# CONNECTIONS
+# ============================================================
+
+# In-memory fallback when Supabase is not available
+_connections_store: list = []
+
+
+@app.post("/connections/{from_user}/{to_user}")
+def create_connection(from_user: str, to_user: str):
+    """Create a pending connection request. Auto-accepts if reverse pending exists."""
+    sb = get_supabase()
+    if sb:
+        try:
+            # Check if reverse pending exists
+            reverse = (
+                sb.table("connections")
+                .select("*")
+                .eq("from_user", to_user)
+                .eq("to_user", from_user)
+                .eq("status", "pending")
+                .execute()
+            )
+            if reverse.data:
+                # Auto-accept both directions
+                sb.table("connections").update({"status": "accepted"}).eq("from_user", to_user).eq("to_user", from_user).execute()
+                sb.table("connections").upsert({"from_user": from_user, "to_user": to_user, "status": "accepted"}).execute()
+                return {"status": "accepted", "from_user": from_user, "to_user": to_user}
+            else:
+                sb.table("connections").upsert({"from_user": from_user, "to_user": to_user, "status": "pending"}).execute()
+                return {"status": "pending", "from_user": from_user, "to_user": to_user}
+        except Exception as e:
+            print(f"Supabase connections error: {e}")
+
+    # In-memory fallback
+    existing = next((c for c in _connections_store if c["from_user"] == to_user and c["to_user"] == from_user and c["status"] == "pending"), None)
+    if existing:
+        existing["status"] = "accepted"
+        _connections_store.append({"from_user": from_user, "to_user": to_user, "status": "accepted"})
+        return {"status": "accepted", "from_user": from_user, "to_user": to_user}
+    _connections_store.append({"from_user": from_user, "to_user": to_user, "status": "pending"})
+    return {"status": "pending", "from_user": from_user, "to_user": to_user}
+
+
+@app.get("/connections/{user_id}")
+def get_connections(user_id: str):
+    """Return all connections (sent + received) for a user."""
+    sb = get_supabase()
+    if sb:
+        try:
+            sent = sb.table("connections").select("*").eq("from_user", user_id).execute()
+            received = sb.table("connections").select("*").eq("to_user", user_id).execute()
+            results = []
+            for row in sent.data:
+                results.append({**row, "direction": "sent"})
+            for row in received.data:
+                results.append({**row, "direction": "received"})
+            return results
+        except Exception as e:
+            print(f"Supabase connections fetch error: {e}")
+
+    # In-memory fallback
+    results = []
+    for c in _connections_store:
+        if c["from_user"] == user_id:
+            results.append({**c, "direction": "sent"})
+        elif c["to_user"] == user_id:
+            results.append({**c, "direction": "received"})
+    return results
+
+
+@app.patch("/connections/{from_user}/{to_user}")
+def update_connection(from_user: str, to_user: str, status: str):
+    """Accept or decline a connection request. On accept, upsert reverse direction."""
+    if status not in ("accepted", "declined"):
+        raise HTTPException(status_code=400, detail="Status must be 'accepted' or 'declined'")
+
+    sb = get_supabase()
+    if sb:
+        try:
+            sb.table("connections").update({"status": status}).eq("from_user", from_user).eq("to_user", to_user).execute()
+            if status == "accepted":
+                sb.table("connections").upsert({"from_user": to_user, "to_user": from_user, "status": "accepted"}).execute()
+            return {"status": status, "from_user": from_user, "to_user": to_user}
+        except Exception as e:
+            print(f"Supabase connection update error: {e}")
+
+    # In-memory fallback
+    for c in _connections_store:
+        if c["from_user"] == from_user and c["to_user"] == to_user:
+            c["status"] = status
+            if status == "accepted":
+                existing_reverse = next((x for x in _connections_store if x["from_user"] == to_user and x["to_user"] == from_user), None)
+                if existing_reverse:
+                    existing_reverse["status"] = "accepted"
+                else:
+                    _connections_store.append({"from_user": to_user, "to_user": from_user, "status": "accepted"})
+            return {"status": status, "from_user": from_user, "to_user": to_user}
+    raise HTTPException(status_code=404, detail="Connection not found")
