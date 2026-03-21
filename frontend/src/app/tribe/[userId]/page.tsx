@@ -42,27 +42,29 @@ export default function TribePage({ params }: { params: Promise<{ userId: string
 
   const firstName = USER_NAMES[userId] ?? "Your";
 
-  // Fetch tribe list on mount
-  useEffect(() => {
-    async function load() {
-      try {
-        const data = await getTribeList(userId);
-        setTribeList(data.tribe_list);
-        // Surface an alert for the top match if available
-        if (data.tribe_list.length > 0) {
-          const top = data.tribe_list[0];
-          setAlert({
-            title: `${top.name} is your top match`,
-            body: `${top.match_score}% compatible — ${top.match_reason.split(".")[0]}.`,
-          });
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setFetching(false);
+  // Fetch tribe list
+  async function loadTribe() {
+    setFetching(true);
+    try {
+      const data = await getTribeList(userId);
+      setTribeList(data.tribe_list);
+      // Surface an alert for the top match if available
+      if (data.tribe_list.length > 0) {
+        const top = data.tribe_list[0];
+        setAlert({
+          title: `${top.name} is your top match`,
+          body: `${top.match_score}% compatible — ${top.match_reason.split(".")[0]}.`,
+        });
       }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setFetching(false);
     }
-    load();
+  }
+
+  useEffect(() => {
+    loadTribe();
   }, [userId]);
 
   async function handleZoneChange(zone: string) {
@@ -133,6 +135,49 @@ export default function TribePage({ params }: { params: Promise<{ userId: string
               {tribeList.length} people
             </div>
           </div>
+
+          {tribeList.length === 0 && (
+            <div style={{
+              margin: "0 16px",
+              padding: "32px 24px",
+              background: "var(--card)",
+              border: "1px solid var(--card-border)",
+              borderRadius: 16,
+              textAlign: "center",
+            }}>
+              <div style={{
+                fontFamily: "var(--font-instrument-serif), serif",
+                fontSize: 18,
+                color: "var(--text-2)",
+                marginBottom: 8,
+              }}>
+                No matches found yet
+              </div>
+              <div style={{
+                fontSize: 13,
+                color: "var(--text-2)",
+                lineHeight: 1.5,
+                marginBottom: 16,
+              }}>
+                The AI may still be processing attendee profiles. Tap below to check again.
+              </div>
+              <button
+                onClick={loadTribe}
+                style={{
+                  padding: "8px 20px",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: "var(--green)",
+                  background: "var(--green-lt)",
+                  border: "1px solid rgba(90,122,92,.18)",
+                  borderRadius: 100,
+                  cursor: "pointer",
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          )}
 
           <div style={{ padding: "0 16px", display: "flex", flexDirection: "column", gap: 10 }}>
             {tribeList.map((match) => (
