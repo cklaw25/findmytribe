@@ -39,6 +39,9 @@ export default function TribePage({ params }: { params: Promise<{ userId: string
   const [view, setView] = useState<"tribe" | "map">("tribe");
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [alert, setAlert] = useState<{ title: string; body: string } | null>(null);
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
   const { currentZone, setCurrentZone } = useZoneContext();
 
   const firstName = USER_NAMES[userId] ?? "Your";
