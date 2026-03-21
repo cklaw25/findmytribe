@@ -96,6 +96,10 @@ export default function HostDashboard() {
 
   const zones = Object.entries(data.zone_counts).sort((a, b) => b[1] - a[1]);
   const hottestZone = zones[0];
+  const activeNow = Object.entries(data.zone_counts)
+    .filter(([z]) => z !== "unknown")
+    .reduce((sum, [, c]) => sum + c, 0);
+  const hasCheckins = Object.entries(data.zone_counts).some(([z, c]) => z !== "unknown" && c > 0);
   const isolatedAttendees = data.attendees.filter(
     (a) => a.zone && a.zone !== "unknown" && data.zone_counts[a.zone] === 1
   );
@@ -179,9 +183,9 @@ export default function HostDashboard() {
       {/* Stats grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "16px 16px 10px" }}>
         <div style={{ background: "var(--card)", border: "1px solid var(--card-border)", borderRadius: "var(--radius-sm)", padding: "14px 16px" }}>
-          <div style={{ fontSize: 11, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: ".07em" }}>Attendees</div>
-          <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 32, marginTop: 4, lineHeight: 1 }}>{data.total_attendees}</div>
-          <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3, fontWeight: 300 }}>checked in today</div>
+          <div style={{ fontSize: 11, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: ".07em" }}>Active right now</div>
+          <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 32, marginTop: 4, lineHeight: 1 }}>{activeNow}</div>
+          <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3, fontWeight: 300 }}>{data.total_attendees} registered</div>
         </div>
         <div style={{ background: "var(--card)", border: "1px solid var(--card-border)", borderRadius: "var(--radius-sm)", padding: "14px 16px" }}>
           <div style={{ fontSize: 11, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: ".07em" }}>Matches made</div>
@@ -208,30 +212,41 @@ export default function HostDashboard() {
       <div style={{ padding: "4px 16px 14px" }}>
         <div style={{ background: "var(--card)", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", padding: 18 }}>
           <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 18, marginBottom: 14 }}>Zone heatmap</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-            {zones.map(([zone, count]) => (
-              <div key={zone} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ fontSize: 12, color: "var(--text-2)", width: 74, flexShrink: 0 }}>
-                  {ZONE_LABELS[zone] ?? zone}
-                </div>
-                <div style={{ flex: 1, height: 22, background: "var(--cream)", borderRadius: 5, overflow: "hidden", border: "1px solid var(--card-border)" }}>
-                  <div style={{
-                    height: "100%", borderRadius: 5, minWidth: 28,
-                    background: "linear-gradient(90deg,var(--green-mid),var(--green))",
-                    width: `${Math.round((count / data.total_attendees) * 100)}%`,
-                    display: "flex", alignItems: "center", justifyContent: "flex-end",
-                    paddingRight: 8, fontSize: 11, fontWeight: 600, color: "#fff",
-                    transition: "width 1.1s cubic-bezier(.22,1,.36,1)",
-                  }}>
+          {!hasCheckins ? (
+            <div style={{ textAlign: "center", padding: "20px 12px" }}>
+              <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 17, color: "var(--text-2)", marginBottom: 6 }}>
+                No check-ins yet
+              </div>
+              <div style={{ fontSize: 13, color: "var(--text-3)", lineHeight: 1.5, fontWeight: 300 }}>
+                Once attendees start sharing their location, zone activity will appear here.
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+              {zones.map(([zone, count]) => (
+                <div key={zone} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ fontSize: 12, color: "var(--text-2)", width: 74, flexShrink: 0 }}>
+                    {ZONE_LABELS[zone] ?? zone}
+                  </div>
+                  <div style={{ flex: 1, height: 22, background: "var(--cream)", borderRadius: 5, overflow: "hidden", border: "1px solid var(--card-border)" }}>
+                    <div style={{
+                      height: "100%", borderRadius: 5, minWidth: 28,
+                      background: "linear-gradient(90deg,var(--green-mid),var(--green))",
+                      width: `${Math.round((count / data.total_attendees) * 100)}%`,
+                      display: "flex", alignItems: "center", justifyContent: "flex-end",
+                      paddingRight: 8, fontSize: 11, fontWeight: 600, color: "#fff",
+                      transition: "width 1.1s cubic-bezier(.22,1,.36,1)",
+                    }}>
+                      {count}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 500, width: 20, textAlign: "right", color: "var(--text-2)" }}>
                     {count}
                   </div>
                 </div>
-                <div style={{ fontSize: 12, fontWeight: 500, width: 20, textAlign: "right", color: "var(--text-2)" }}>
-                  {count}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
