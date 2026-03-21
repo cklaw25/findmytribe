@@ -4,6 +4,7 @@ from matchmaker import build_tribe_list
 from dotenv import load_dotenv
 import json
 import os
+import asyncio
 
 load_dotenv(".env.local")
 load_dotenv()  # .env as fallback (won't override existing vars)
@@ -29,6 +30,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Luffa bot routes
+from luffa_bot import router as luffa_router
+app.include_router(luffa_router)
 
 with open("mock_data.json") as f:
     ATTENDEES: list = json.load(f)
@@ -159,7 +164,54 @@ def update_location(user_id: str, zone: str, background_tasks: BackgroundTasks):
     if user_id in _matched_users:
         background_tasks.add_task(_rerank_user, user_id)
 
+    # LB-FR2: Check if any OTHER users have this person as a top match — notify them via Luffa
+    background_tasks.add_task(_notify_zone_watchers, user_id, zone)
+
     return {"status": "ok", "user_id": user_id, "zone": zone}
+
+
+def _notify_zone_watchers(arriving_user_id: str, zone: str):
+    """
+    When someone checks into a zone, find other users in the same zone who have
+    them as a top match and send a proactive Luffa alert. This is the autonomous
+    agent behavior — fires with zero user input.
+    """
+    from luffa_bot import notify_zone_match, _internal_to_luffa
+
+    arriving = next((a for a in ATTENDEES if a["id"] == arriving_user_id), None)
+    if not arriving:
+        return
+
+    # Only check users who have Luffa linked AND have been matched
+    for watcher_internal_id in list(_internal_to_luffa.keys()):
+        if watcher_internal_id == arriving_user_id:
+            continue
+        if watcher_internal_id not in _matched_users:
+            continue
+
+        # Check if the arriving user is in their tribe list (cached in Supabase)
+        sb = get_supabase()
+        if sb:
+            try:
+                rows = (
+                    sb.table("tribe_list")
+                    .select("score, reason, talking_points, match_type")
+                    .eq("user_id", watcher_internal_id)
+                    .eq("match_id", arriving_user_id)
+                    .execute()
+                )
+                if rows.data:
+                    match_data = rows.data[0]
+                    match_info = {
+                        **arriving,
+                        "match_score": int(match_data.get("score", 0)),
+                        "match_reason": match_data.get("reason", ""),
+                        "talking_points": match_data.get("talking_points", []),
+                        "match_type": match_data.get("match_type", "peer"),
+                    }
+                    asyncio.run(notify_zone_match(watcher_internal_id, match_info, zone))
+            except Exception as e:
+                print(f"[ZoneWatcher] Error checking matches for {watcher_internal_id}: {e}")
 
 
 @app.get("/location/{user_id}")

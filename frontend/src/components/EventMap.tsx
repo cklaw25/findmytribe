@@ -182,7 +182,7 @@ export function EventMap({ tribeList, highlightId, selfZone = "entrance" }: Even
             border: "2.5px solid #fff", boxShadow: "0 2px 10px rgba(0,0,0,.14)",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "var(--font-instrument-serif), serif",
-            fontSize: 11, color: "#fff", background: "var(--text)",
+            fontSize: 11, color: "#fff", background: "#E85D4A",
             animation: "selfring 2.2s ease-out infinite",
           }}>
             Me
@@ -226,7 +226,7 @@ export function EventMap({ tribeList, highlightId, selfZone = "entrance" }: Even
       {/* Legend */}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", padding: "0 20px 10px", fontSize: 12, color: "var(--text-2)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <div style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--text)" }} />
+          <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#E85D4A" }} />
           You
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
