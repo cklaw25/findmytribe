@@ -8,8 +8,8 @@ import { EventMap } from "@/components/EventMap";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { TopBar } from "@/components/TopBar";
 import { TabBar } from "@/components/TabBar";
-import { AlertStrip } from "@/components/AlertStrip";
 import { ZoneScroll, ZONE_LABELS } from "@/components/ZoneScroll";
+import { useZoneContext } from "@/contexts/ZoneAlertContext";
 
 const LOADING_STEPS = [
   "Reading attendee profiles...",
@@ -37,8 +37,7 @@ export default function TribePage({ params }: { params: Promise<{ userId: string
   const [view, setView] = useState<"tribe" | "map">("tribe");
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [currentZone, setCurrentZone] = useState<Zone>("entrance");
-  const [alert, setAlert] = useState<{ title: string; body: string } | null>(null);
+  const { currentZone, setCurrentZone } = useZoneContext();
 
   const firstName = USER_NAMES[userId] ?? "Your";
 
@@ -48,14 +47,6 @@ export default function TribePage({ params }: { params: Promise<{ userId: string
       try {
         const data = await getTribeList(userId);
         setTribeList(data.tribe_list);
-        // Surface an alert for the top match if available
-        if (data.tribe_list.length > 0) {
-          const top = data.tribe_list[0];
-          setAlert({
-            title: `${top.name} is your top match`,
-            body: `${top.match_score}% compatible — ${top.match_reason.split(".")[0]}.`,
-          });
-        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -112,14 +103,6 @@ export default function TribePage({ params }: { params: Promise<{ userId: string
       {view === "tribe" && (
         <>
           <ZoneScroll activeZone={currentZone} onChange={handleZoneChange} />
-
-          {alert && (
-            <AlertStrip
-              title={alert.title}
-              body={alert.body}
-              onDismiss={() => setAlert(null)}
-            />
-          )}
 
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", padding: "16px 20px 10px" }}>
             <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 19 }}>
