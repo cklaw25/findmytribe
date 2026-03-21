@@ -96,4 +96,4 @@ There is no test suite yet. Verify changes manually via the browser and the Fast
 - `PRD.md` — product requirements and feature scope
 - `TEAM_BRIEF.md` — team context and hackathon brief
 - `frontend/AGENTS.md` — Next.js-specific agent rules
-- `findmytribe.html` — original single-file UI prototype (source of truth for visual design)
+- `frontend/` — all visual design from the original HTML prototype has been ported here
