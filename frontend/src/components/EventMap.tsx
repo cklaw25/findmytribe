@@ -107,6 +107,40 @@ export function EventMap({ tribeList, highlightId, selfZone = "entrance" }: Even
           </div>
         ))}
 
+        {/* Empty state overlay */}
+        {tribeList.length === 0 && (
+          <div style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            zIndex: 20,
+            background: "rgba(253, 250, 244, 0.85)",
+            borderRadius: "var(--radius)",
+            padding: "32px 28px",
+            textAlign: "center",
+            maxWidth: "80%",
+          }}>
+            <h3 style={{
+              fontFamily: "var(--font-instrument-serif), serif",
+              fontSize: 22,
+              fontWeight: 400,
+              color: "var(--text)",
+              margin: "0 0 8px",
+            }}>
+              Be the first to check in!
+            </h3>
+            <p style={{
+              fontSize: 13.5,
+              lineHeight: 1.5,
+              color: "var(--text-2)",
+              margin: 0,
+            }}>
+              Once attendees start sharing their location, you will see them appear on the map.
+            </p>
+          </div>
+        )}
+
         {/* Self dot */}
         <div style={{
           position: "absolute",
