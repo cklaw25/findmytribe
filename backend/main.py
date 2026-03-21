@@ -60,8 +60,8 @@ def get_tribe_list(user_id: str):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    tribe = build_tribe_list(user, ATTENDEES)
-    top8 = tribe[:8]
+    result = build_tribe_list(user, ATTENDEES)
+    top8 = result["tribe_list"][:8]
 
     # Persist to Supabase if available
     sb = get_supabase()
@@ -87,6 +87,23 @@ def get_tribe_list(user_id: str):
     _matched_users.add(user_id)
 
     return {"user_id": user_id, "tribe_list": top8}
+
+
+@app.get("/debug/match/{user_id}")
+def debug_match(user_id: str):
+    user = next((a for a in ATTENDEES if a["id"] == user_id), None)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = build_tribe_list(user, ATTENDEES)
+    debug = result["debug"]
+    debug["supabase_connected"] = get_supabase() is not None
+
+    return {
+        "user_id": user_id,
+        "debug": debug,
+        "tribe_list": result["tribe_list"],
+    }
 
 
 @app.post("/location/{user_id}")
