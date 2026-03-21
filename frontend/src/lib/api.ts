@@ -35,3 +35,21 @@ export async function getDebugMatch(userId: string) {
   if (!res.ok) throw new Error("Failed to fetch debug match data");
   return res.json();
 }
+
+export async function sendConnectionRequest(fromUser: string, toUser: string) {
+  const res = await fetch(`${API_URL}/connections/${fromUser}/${toUser}`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to send connection request");
+  return res.json();
+}
+
+export async function fetchConnections(userId: string) {
+  const res = await fetch(`${API_URL}/connections/${userId}`);
+  if (!res.ok) throw new Error("Failed to fetch connections");
+  return res.json();
+}
+
+export async function updateConnectionStatus(fromUser: string, toUser: string, status: "accepted" | "declined") {
+  const res = await fetch(`${API_URL}/connections/${fromUser}/${toUser}?status=${status}`, { method: "PATCH" });
+  if (!res.ok) throw new Error("Failed to update connection status");
+  return res.json();
+}
