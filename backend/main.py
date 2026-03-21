@@ -5,7 +5,8 @@ from dotenv import load_dotenv
 import json
 import os
 
-load_dotenv()
+load_dotenv(".env.local")
+load_dotenv()  # .env as fallback (won't override existing vars)
 
 # Lazy-load Supabase so the app still boots without keys during dev
 _supabase = None
@@ -66,7 +67,7 @@ def get_tribe_list(user_id: str):
     sb = get_supabase()
     if sb:
         for match in top8:
-            sb.table("tribe_list").upsert({
+            row = {
                 "user_id": user_id,
                 "match_id": match["id"],
                 "score": match["match_score"],
@@ -74,7 +75,14 @@ def get_tribe_list(user_id: str):
                 "talking_points": match["talking_points"],
                 "match_type": match["match_type"],
                 "source": match["source"],
-            }).execute()
+                "background": match.get("background", ""),
+            }
+            try:
+                sb.table("tribe_list").upsert(row).execute()
+            except Exception:
+                # background column may not exist yet — retry without it
+                row.pop("background", None)
+                sb.table("tribe_list").upsert(row).execute()
 
     _matched_users.add(user_id)
 

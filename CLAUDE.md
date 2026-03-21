@@ -5,8 +5,8 @@
 ## Environment Variables
 
 ```env
-# backend/.env
-ANTHROPIC_API_KEY=sk-ant-...        # optional — falls back to mock scoring without it
+# backend/.env.local (not tracked by git)
+OPENAI_API_KEY=sk-...               # optional — falls back to mock scoring without it
 SUPABASE_URL=https://xxx.supabase.co
 SUPABASE_SERVICE_KEY=eyJ...
 

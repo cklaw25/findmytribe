@@ -137,6 +137,16 @@ export function ProfileCard({ profile, onViewMap, expanded = false, isOnline }: 
         </button>
       </div>
 
+      {/* AI-generated background */}
+      {expanded && profile.background && (
+        <div style={{
+          fontSize: 13, color: "var(--text-2)", fontStyle: "italic",
+          fontWeight: 300, lineHeight: 1.52, marginTop: 10,
+        }}>
+          {profile.background}
+        </div>
+      )}
+
       {/* Expanded: conversation starters */}
       {expanded && profile.talking_points.length > 0 && (
         <div style={{
