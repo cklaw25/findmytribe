@@ -18,6 +18,7 @@ export interface TribeMatch extends Attendee {
   talking_points: string[];
   match_type: "collaborator" | "mentor" | "peer" | "founder_match" | "investor";
   source: "interest_match" | "mutual_friend";
+  background?: string;
 }
 
 export interface LocationData {

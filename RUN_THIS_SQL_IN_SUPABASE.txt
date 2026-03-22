@@ -1,0 +1,13 @@
+CREATE TABLE connections (
+    from_user TEXT NOT NULL, to_user TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending'
+      CHECK (status IN ('pending','accepted','declined')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (from_user, to_user)
+);
+CREATE INDEX idx_connections_to_user ON connections (to_user);
+ALTER TABLE connections ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read on connections" ON connections FOR SELECT USING (true);
+CREATE POLICY "Allow insert on connections" ON connections FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow update on connections" ON connections FOR UPDATE USING (true) WITH CHECK (true);
