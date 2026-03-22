@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, use } from "react";
 import { useRouter } from "next/navigation";
 import { getConnections, getChatMessages, addChatMessage, type ChatMessage } from "@/lib/connections";
+import { sendMessage, getMessages } from "@/lib/api";
 import { TopBar } from "@/components/TopBar";
 
 export default function ChatThreadPage({ params }: { params: Promise<{ userId: string; matchId: string }> }) {
@@ -16,20 +17,48 @@ export default function ChatThreadPage({ params }: { params: Promise<{ userId: s
   const matchName = connection?.name ?? "Chat";
 
   useEffect(() => {
-    const existing = getChatMessages(userId, matchId);
-    if (existing.length === 0) {
-      // Seed welcome message
-      const welcome: ChatMessage = {
-        id: "system_welcome",
-        from: "system",
-        text: `You connected at Encode Club AI London! Start chatting with ${matchName}.`,
-        timestamp: Date.now(),
-      };
-      addChatMessage(userId, matchId, welcome);
-      setMessages([welcome]);
-    } else {
-      setMessages(existing);
-    }
+    // Try loading from API (Supabase-persisted), fall back to localStorage
+    getMessages(userId, matchId)
+      .then((remote) => {
+        if (remote.length > 0) {
+          const mapped: ChatMessage[] = remote.map((m: any) => ({
+            id: m.id,
+            from: m.from_user,
+            text: m.text,
+            timestamp: new Date(m.created_at).getTime(),
+          }));
+          setMessages(mapped);
+        } else {
+          const local = getChatMessages(userId, matchId);
+          if (local.length === 0) {
+            const welcome: ChatMessage = {
+              id: "system_welcome",
+              from: "system",
+              text: `You connected at Encode Club AI London! Start chatting with ${matchName}.`,
+              timestamp: Date.now(),
+            };
+            addChatMessage(userId, matchId, welcome);
+            setMessages([welcome]);
+          } else {
+            setMessages(local);
+          }
+        }
+      })
+      .catch(() => {
+        const local = getChatMessages(userId, matchId);
+        if (local.length === 0) {
+          const welcome: ChatMessage = {
+            id: "system_welcome",
+            from: "system",
+            text: `You connected at Encode Club AI London! Start chatting with ${matchName}.`,
+            timestamp: Date.now(),
+          };
+          addChatMessage(userId, matchId, welcome);
+          setMessages([welcome]);
+        } else {
+          setMessages(local);
+        }
+      });
   }, [userId, matchId, matchName]);
 
   useEffect(() => {
@@ -45,9 +74,12 @@ export default function ChatThreadPage({ params }: { params: Promise<{ userId: s
       text,
       timestamp: Date.now(),
     };
+    // Optimistic update
     const updated = addChatMessage(userId, matchId, msg);
     setMessages(updated);
     setInput("");
+    // Persist to Supabase via API (fire-and-forget)
+    sendMessage(userId, matchId, text).catch(() => {});
   }
 
   function getInitials(name: string) {

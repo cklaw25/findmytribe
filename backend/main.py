@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from matchmaker import build_tribe_list
 from dotenv import load_dotenv
@@ -342,8 +342,21 @@ _connections_store: list = []
 
 
 @app.post("/connections/{from_user}/{to_user}")
-def create_connection(from_user: str, to_user: str):
-    """Create a pending connection request. Auto-accepts if reverse pending exists."""
+def create_connection(from_user: str, to_user: str, enforce_match: bool = True):
+    """Create a pending connection request. Only allowed if they're mutual matches. Auto-accepts if reverse pending exists."""
+    # Enforce mutual match: to_user must appear in from_user's tribe list
+    if enforce_match:
+        from_user_profile = next((a for a in ATTENDEES if a["id"] == from_user), None)
+        if from_user_profile:
+            try:
+                result = build_tribe_list(from_user_profile, ATTENDEES)
+                tribe_ids = {m["id"] for m in result["tribe_list"]}
+                if to_user not in tribe_ids:
+                    raise HTTPException(status_code=403, detail="You can only connect with people in your tribe list")
+            except HTTPException:
+                raise
+            except Exception:
+                pass  # If matching fails, allow the connection
     sb = get_supabase()
     if sb:
         try:
@@ -432,3 +445,56 @@ def update_connection(from_user: str, to_user: str, status: str):
                     _connections_store.append({"from_user": to_user, "to_user": from_user, "status": "accepted"})
             return {"status": status, "from_user": from_user, "to_user": to_user}
     raise HTTPException(status_code=404, detail="Connection not found")
+
+
+# ============================================================
+# MESSAGES (chat persistence)
+# ============================================================
+
+import time as _time
+
+_messages_store: list = []  # in-memory fallback
+
+
+@app.post("/messages/{from_user}/{to_user}")
+async def post_message(from_user: str, to_user: str, request: Request):
+    body = await request.json()
+    text = body.get("text", "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="text required")
+    msg = {
+        "id": f"msg_{int(_time.time() * 1000)}",
+        "from_user": from_user,
+        "to_user": to_user,
+        "text": text,
+        "created_at": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+    }
+    sb = get_supabase()
+    if sb:
+        try:
+            sb.table("messages").insert(msg).execute()
+            return msg
+        except Exception as e:
+            print(f"Supabase message insert error: {e}")
+    _messages_store.append(msg)
+    return msg
+
+
+@app.get("/messages/{user_id}/{other_user}")
+def get_messages(user_id: str, other_user: str):
+    sb = get_supabase()
+    if sb:
+        try:
+            sent = sb.table("messages").select("*").eq("from_user", user_id).eq("to_user", other_user).execute()
+            received = sb.table("messages").select("*").eq("from_user", other_user).eq("to_user", user_id).execute()
+            combined = sorted(sent.data + received.data, key=lambda m: m.get("created_at", ""))
+            return combined
+        except Exception as e:
+            print(f"Supabase messages fetch error: {e}")
+    # In-memory fallback
+    return sorted(
+        [m for m in _messages_store if
+         (m["from_user"] == user_id and m["to_user"] == other_user) or
+         (m["from_user"] == other_user and m["to_user"] == user_id)],
+        key=lambda m: m.get("created_at", "")
+    )

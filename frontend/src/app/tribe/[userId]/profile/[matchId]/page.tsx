@@ -70,9 +70,15 @@ export default function MatchProfilePage({ params }: { params: Promise<{ userId:
 
       <div style={{ padding: '0 20px' }}>
         <h2 style={{ fontFamily: 'serif', fontSize: 20, color: '#1C1A17', marginBottom: 10 }}>About them</h2>
-        <div style={{ background: '#F0EBE0', borderRadius: 14, padding: '14px 16px', color: '#6B6459', fontSize: 15, lineHeight: 1.6, marginBottom: 8 }}>
-          {match.bio}
-        </div>
+        {match.background ? (
+          <div style={{ background: '#F0EBE0', borderRadius: 14, padding: '14px 16px', color: '#6B6459', fontSize: 15, lineHeight: 1.6, marginBottom: 8 }}>
+            {match.background}
+          </div>
+        ) : (
+          <div style={{ background: '#F0EBE0', borderRadius: 14, padding: '14px 16px', color: '#6B6459', fontSize: 15, lineHeight: 1.6, marginBottom: 8 }}>
+            {match.bio}
+          </div>
+        )}
         <div style={{ background: '#F0EBE0', borderRadius: 14, padding: '14px 16px', color: '#6B6459', fontSize: 15, lineHeight: 1.6, marginBottom: 24, fontStyle: 'italic' }}>
           {match.match_reason}
         </div>

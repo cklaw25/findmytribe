@@ -127,23 +127,27 @@ export default function HostDashboard() {
     (a) => a.zone && a.zone !== "unknown" && data.zone_counts[a.zone] === 1
   );
 
-  const GRAPH_NODES = [
-    { id: "usr_001", name: "Aisha P.", initials: "AP" },
-    { id: "usr_002", name: "James O.", initials: "JO" },
-    { id: "usr_003", name: "Sofia M.", initials: "SM" },
-    { id: "usr_004", name: "Nina C.", initials: "NC" },
-    { id: "usr_005", name: "Tariq A.", initials: "TA" },
-    { id: "usr_006", name: "Luca F.", initials: "LF" },
-    { id: "usr_007", name: "Yuki T.", initials: "YT" },
-    { id: "usr_008", name: "Priya K.", initials: "PK" },
-    { id: "usr_009", name: "Ben W.", initials: "BW" },
-    { id: "usr_015", name: "Omar H.", initials: "OH" },
-  ];
-
-  const GRAPH_EDGES: [number, number][] = [
-    [0, 1], [0, 2], [0, 5], [1, 3], [1, 6], [2, 4], [2, 7],
-    [3, 5], [4, 8], [5, 6], [6, 9], [7, 8], [7, 9], [3, 7],
-  ];
+  // Build social graph from real attendee data using mutual_friend_ids
+  const graphAttendees = data.attendees.slice(0, 12);
+  const GRAPH_NODES = graphAttendees.map((a) => ({
+    id: a.id,
+    initials: getInitials(a.name),
+  }));
+  const nodeIndexById = Object.fromEntries(GRAPH_NODES.map((n, i) => [n.id, i]));
+  const edgeSet = new Set<string>();
+  const GRAPH_EDGES: [number, number][] = [];
+  graphAttendees.forEach((a: AttendeeWithZone & { mutual_friend_ids?: string[] }, i) => {
+    (a.mutual_friend_ids ?? []).forEach((friendId: string) => {
+      const j = nodeIndexById[friendId];
+      if (j !== undefined && j !== i) {
+        const key = [Math.min(i, j), Math.max(i, j)].join("-");
+        if (!edgeSet.has(key)) {
+          edgeSet.add(key);
+          GRAPH_EDGES.push([i, j]);
+        }
+      }
+    });
+  });
 
   function SocialGraph() {
     const cx = 160, cy = 140, r = 110;
@@ -306,12 +310,15 @@ export default function HostDashboard() {
                       {ZONE_LABELS[attendee.zone] ?? attendee.zone} · alone
                     </div>
                   </div>
-                  <button style={{
-                    padding: "5px 14px", borderRadius: 100, border: "1px solid var(--card-border)",
-                    background: "var(--card)", color: "var(--text)", cursor: "pointer",
-                    fontFamily: "var(--font-geist-sans), sans-serif", fontSize: 11, fontWeight: 600,
-                  }}>
-                    Introduce
+                  <button
+                    onClick={() => router.push(`/tribe/${attendee.id}`)}
+                    style={{
+                      padding: "5px 14px", borderRadius: 100, border: "1px solid var(--card-border)",
+                      background: "var(--card)", color: "var(--text)", cursor: "pointer",
+                      fontFamily: "var(--font-geist-sans), sans-serif", fontSize: 11, fontWeight: 600,
+                    }}
+                  >
+                    Go introduce
                   </button>
                 </div>
               ))}

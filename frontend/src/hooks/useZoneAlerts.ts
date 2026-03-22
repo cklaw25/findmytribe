@@ -9,6 +9,7 @@ const COOLDOWN_MS = 30_000;
 interface ZoneAlert {
   title: string;
   body: string;
+  matchId: string;
 }
 
 export function useZoneAlerts({
@@ -80,6 +81,7 @@ export function useZoneAlerts({
           setAlert({
             title: `${firstName} just arrived in ${zoneName}`,
             body: `${tribeMatch.match_score}% match — go say hi!`,
+            matchId: tribeMatch.id,
           });
         }
       )

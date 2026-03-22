@@ -53,3 +53,19 @@ export async function updateConnectionStatus(fromUser: string, toUser: string, s
   if (!res.ok) throw new Error("Failed to update connection status");
   return res.json();
 }
+
+export async function sendMessage(fromUser: string, toUser: string, text: string) {
+  const res = await fetch(`${API_URL}/messages/${fromUser}/${toUser}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) throw new Error("Failed to send message");
+  return res.json();
+}
+
+export async function getMessages(userId: string, otherId: string) {
+  const res = await fetch(`${API_URL}/messages/${userId}/${otherId}`);
+  if (!res.ok) throw new Error("Failed to get messages");
+  return res.json();
+}

@@ -1,5 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getTribeList } from "@/lib/api";
 import { useZoneAlerts } from "@/hooks/useZoneAlerts";
 import { AlertStrip } from "@/components/AlertStrip";
@@ -20,6 +21,7 @@ export function useZoneContext() {
 }
 
 export function ZoneAlertProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [currentZone, setCurrentZone] = useState<Zone>("entrance");
   const [tribeList, setTribeList] = useState<TribeMatch[]>([]);
@@ -63,6 +65,12 @@ export function ZoneAlertProvider({ children }: { children: React.ReactNode }) {
             title={alert.title}
             body={alert.body}
             onDismiss={dismissAlert}
+            onTap={() => {
+              if (userId && alert.matchId) {
+                router.push(`/tribe/${userId}/profile/${alert.matchId}`);
+              }
+              dismissAlert();
+            }}
           />
         </div>
       )}
