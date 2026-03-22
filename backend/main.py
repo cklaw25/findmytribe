@@ -72,13 +72,17 @@ async def _agent_loop():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Start autonomous background agent on server boot
-    task = asyncio.create_task(_agent_loop())
+    from luffa_bot import luffa_poll_loop
+    zone_task = asyncio.create_task(_agent_loop())
+    luffa_task = asyncio.create_task(luffa_poll_loop())
     yield
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
+    zone_task.cancel()
+    luffa_task.cancel()
+    for t in (zone_task, luffa_task):
+        try:
+            await t
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(title="FindMyTribe API", lifespan=lifespan)
