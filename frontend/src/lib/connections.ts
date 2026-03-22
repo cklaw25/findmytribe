@@ -24,21 +24,12 @@ function getKey(userId: string, suffix: string) {
   return `${STORAGE_PREFIX}${userId}_${suffix}`;
 }
 
-const DEFAULT_INVITATIONS: Invitation[] = [
-  { id: "usr_007", name: "Yuki Tanaka", role: "AI Safety Researcher", company: "Apollo Research", initials: "YT", status: "pending", direction: "sent", timestamp: Date.now() - 3600000 },
-  { id: "usr_002", name: "James Okafor", role: "Founder", company: "Stealth", initials: "JO", status: "accepted", direction: "sent", timestamp: Date.now() - 7200000 },
-  { id: "usr_003", name: "Sofia Marchetti", role: "ML Researcher", company: "UCL", initials: "SM", status: "pending", direction: "received", timestamp: Date.now() - 1800000 },
-  { id: "usr_006", name: "Luca Ferreira", role: "Full Stack Dev", company: "Freelance", initials: "LF", status: "accepted", direction: "received", timestamp: Date.now() - 5400000 },
-];
-
 export function getInvitations(userId: string): Invitation[] {
   if (typeof window === "undefined") return [];
   const key = getKey(userId, "invitations");
   const stored = localStorage.getItem(key);
   if (stored) return JSON.parse(stored);
-  // Seed with defaults on first load
-  localStorage.setItem(key, JSON.stringify(DEFAULT_INVITATIONS));
-  return DEFAULT_INVITATIONS;
+  return [];
 }
 
 export function addInvitation(userId: string, inv: Invitation): void {

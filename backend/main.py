@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from matchmaker import build_tribe_list
@@ -26,7 +27,61 @@ def get_supabase():
     return _supabase
 
 
-app = FastAPI(title="FindMyTribe API")
+# ============================================================
+# BACKGROUND AGENT LOOP
+# Continuously monitors zone changes and fires proactive alerts.
+# This is what makes the system autonomous — it never stops, never
+# waits to be asked. PERCEIVE → REASON → ACT → ADAPT.
+# ============================================================
+
+_last_known_zones: dict = {}   # {user_id: zone}
+AGENT_POLL_INTERVAL = 8        # seconds between zone polls
+
+
+async def _agent_loop():
+    """
+    Autonomous agent: polls Supabase every 8s for zone changes.
+    When a user moves into a new zone, fires zone-match alerts to
+    every watcher who has that user in their tribe list.
+    Runs for the lifetime of the server process.
+    """
+    global _last_known_zones
+    print("[Agent] Background zone-watch loop started")
+    while True:
+        try:
+            sb = get_supabase()
+            if sb:
+                rows = sb.table("locations").select("user_id, zone").execute().data
+                for row in rows:
+                    uid = row["user_id"]
+                    zone = row["zone"]
+                    if _last_known_zones.get(uid) != zone:
+                        if uid in _last_known_zones:
+                            # Zone changed — fire proactive alerts in a thread
+                            # (sync Supabase client can't run in async context directly)
+                            loop = asyncio.get_event_loop()
+                            await loop.run_in_executor(
+                                None, _notify_zone_watchers, uid, zone
+                            )
+                        _last_known_zones[uid] = zone
+        except Exception as e:
+            print(f"[Agent] Loop error: {e}")
+        await asyncio.sleep(AGENT_POLL_INTERVAL)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Start autonomous background agent on server boot
+    task = asyncio.create_task(_agent_loop())
+    yield
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+
+
+app = FastAPI(title="FindMyTribe API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

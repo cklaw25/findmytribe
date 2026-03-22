@@ -27,7 +27,7 @@ export default function MatchProfilePage({ params }: { params: Promise<{ userId:
 
   useEffect(() => {
     if (!userId || !matchId) return;
-    fetch(`http://localhost:8000/match/${userId}`, { method: 'POST' })
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/match/${userId}`, { method: 'POST' })
       .then(r => r.json())
       .then(data => {
         const list = data.tribe_list ?? [];

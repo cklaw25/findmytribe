@@ -4,7 +4,8 @@ import os
 import time
 from typing import List
 
-_openai_client = None
+_anthropic_client = None
+_openai_client = None  # kept for optional embedding pre-filter only
 
 PREFILTER_TOP_K = int(os.getenv("TRIBE_PREFILTER_K", "20"))
 EMBEDDING_MODEL = "text-embedding-3-small"
@@ -24,8 +25,19 @@ def _retry(fn, max_retries=2, backoff=1.0):
     raise last_exc
 
 
-def _get_client():
-    """Lazy-load OpenAI client (only when OPENAI_API_KEY is set)."""
+def _get_anthropic_client():
+    """Lazy-load Anthropic client (only when ANTHROPIC_API_KEY is set)."""
+    global _anthropic_client
+    if _anthropic_client is None:
+        key = os.getenv("ANTHROPIC_API_KEY", "")
+        if key:
+            from anthropic import Anthropic
+            _anthropic_client = Anthropic(api_key=key)
+    return _anthropic_client
+
+
+def _get_openai_client():
+    """Lazy-load OpenAI client — used only for embedding pre-filter."""
     global _openai_client
     if _openai_client is None:
         key = os.getenv("OPENAI_API_KEY", "")
@@ -89,9 +101,9 @@ def _format_profile(p: dict) -> str:
     return "\n".join(parts)
 
 
-def _batch_match_openai(user: dict, candidates: List[dict]) -> List[dict]:
-    """Single GPT-4o call that scores all candidates at once."""
-    client = _get_client()
+def _batch_match_claude(user: dict, candidates: List[dict]) -> List[dict]:
+    """Single Claude API call that scores all candidates at once."""
+    client = _get_anthropic_client()
     if client is None:
         return []
 
@@ -105,27 +117,25 @@ def _batch_match_openai(user: dict, candidates: List[dict]) -> List[dict]:
         + "\n\n".join(candidate_blocks)
     )
 
-    response = _retry(lambda: client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_message},
-        ],
-        response_format={"type": "json_object"},
+    response = _retry(lambda: client.messages.create(
+        model="claude-sonnet-4-6",
         max_tokens=8192,
-        temperature=0.7,
-        timeout=30,
+        system=SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_message}],
     ))
 
-    data = json.loads(response.choices[0].message.content)
+    content = response.content[0].text.strip()
+    # Strip any accidental markdown fences
+    if content.startswith("```"):
+        content = content.split("```")[1]
+        if content.startswith("json"):
+            content = content[4:]
+    data = json.loads(content)
     return data.get("matches", [])
 
 
 def normalize_score(raw: float, min_out: float = 35, max_out: float = 95, steepness: float = 0.08) -> int:
-    """Sigmoid compression to prevent extreme scores.
-
-    Maps raw 0-100 → bounded min_out-max_out range with smooth falloff.
-    """
+    """Sigmoid compression: maps raw 0-100 → bounded min_out-max_out range."""
     midpoint = 50
     sigmoid = 1 / (1 + math.exp(-steepness * (raw - midpoint)))
     return int(min_out + sigmoid * (max_out - min_out))
@@ -135,13 +145,13 @@ def _mock_match(a: dict, b: dict) -> dict:
     """Score match by shared interests when no API key is available."""
     shared = set(a.get("interests", [])) & set(b.get("interests", []))
     score = min(95, 50 + len(shared) * 10)
-    topic = next(iter(shared), a.get("interests", ["tech"])[0])
+    topic = next(iter(shared), a.get("interests", ["tech"])[0] if a.get("interests") else "tech")
     return {
         "score": score,
         "reason": f"Both interested in {topic} — worth a conversation.",
         "talking_points": [
             f"Ask about their work on {topic}.",
-            f"You're both at {b.get('company', 'this event')} — compare notes.",
+            f"You're both building at this event — compare notes.",
             "What's the most surprising thing you've learned today?",
         ],
         "match_type": "peer",
@@ -172,8 +182,8 @@ def _cosine_similarity(a: List[float], b: List[float]) -> float:
 
 
 def _get_embeddings_batch(profiles: List[dict]) -> dict:
-    """Fetch embeddings for profiles, using cache. Returns {id: [float,...]}."""
-    client = _get_client()
+    """Fetch embeddings for profiles via OpenAI (optional pre-filter only)."""
+    client = _get_openai_client()
     if client is None:
         return {}
 
@@ -205,11 +215,7 @@ def _get_embeddings_batch(profiles: List[dict]) -> dict:
 def _prefilter_candidates(
     user: dict, candidates: List[dict], top_k: int = PREFILTER_TOP_K
 ) -> tuple:
-    """Return (filtered_candidates, debug_dict).
-
-    Short-circuits when len(candidates) <= top_k.
-    Falls through to all candidates on any failure.
-    """
+    """Return (filtered_candidates, debug_dict). Short-circuits when candidates <= top_k."""
     debug = {
         "prefilter_top_k": top_k,
         "candidates_total": len(candidates),
@@ -252,7 +258,7 @@ def _prefilter_candidates(
 
 
 def build_tribe_list(user: dict, all_attendees: List[dict]) -> dict:
-    """Build ranked tribe list using batch OpenAI matching with mock fallback.
+    """Build ranked tribe list using Claude API matching with mock fallback.
 
     Returns a dict with keys:
       - tribe_list: sorted list of match dicts (each includes ai_source)
@@ -261,24 +267,24 @@ def build_tribe_list(user: dict, all_attendees: List[dict]) -> dict:
     candidates = [a for a in all_attendees if a["id"] != user["id"]]
     mutual_ids = set(user.get("mutual_friend_ids", []))
 
-    openai_key_set = bool(os.getenv("OPENAI_API_KEY", ""))
+    anthropic_key_set = bool(os.getenv("ANTHROPIC_API_KEY", ""))
     api_call_ok = False
     ai_scored = 0
     mock_scored = 0
 
-    # Pre-filter candidates via embedding similarity
+    # Pre-filter candidates via embedding similarity (optional, uses OpenAI if available)
     filtered_candidates, prefilter_debug = _prefilter_candidates(user, candidates)
 
-    # Try batch OpenAI call (only on pre-filtered subset)
+    # Batch Claude API call on pre-filtered candidates
     ai_lookup: dict = {}
     try:
-        ai_matches = _batch_match_openai(user, filtered_candidates)
+        ai_matches = _batch_match_claude(user, filtered_candidates)
         for m in ai_matches:
             ai_lookup[m["id"]] = m
         if ai_matches:
             api_call_ok = True
     except Exception as e:
-        print(f"OpenAI batch match error: {e}")
+        print(f"Claude batch match error: {e}")
 
     results = []
     for attendee in candidates:
@@ -291,7 +297,7 @@ def build_tribe_list(user: dict, all_attendees: List[dict]) -> dict:
                 "match_type": ai.get("match_type", "peer"),
                 "background": ai.get("background", ""),
             }
-            ai_source = "gpt-4o"
+            ai_source = "claude-sonnet-4-6"
             ai_scored += 1
         else:
             match = _mock_match(user, attendee)
@@ -318,11 +324,11 @@ def build_tribe_list(user: dict, all_attendees: List[dict]) -> dict:
     return {
         "tribe_list": tribe_list,
         "debug": {
-            "openai_key_set": openai_key_set,
+            "anthropic_key_set": anthropic_key_set,
             "api_call_ok": api_call_ok,
             "ai_scored": ai_scored,
             "mock_scored": mock_scored,
-            "model": "gpt-4o",
+            "model": "claude-sonnet-4-6",
             **prefilter_debug,
         },
     }
