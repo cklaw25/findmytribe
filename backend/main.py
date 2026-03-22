@@ -96,17 +96,32 @@ app.include_router(luffa_router)
 with open(_here / "mock_data.json") as f:
     _MOCK_ATTENDEES: list = json.load(f)
 
-# Dynamic attendees: Supabase profiles + mock fallback
+# In-memory profile cache — survives Supabase disconnects.
+# Seeded with mock data; updated whenever Supabase returns profiles
+# or a new profile is registered this session.
+_profile_cache: dict = {a["id"]: a for a in _MOCK_ATTENDEES}
+
+
+def _update_cache(profiles: list):
+    """Merge a list of profiles into the cache (Supabase data wins)."""
+    for p in profiles:
+        _profile_cache[p["id"]] = p
+
+
+# Dynamic attendees: Supabase profiles + in-memory cache fallback
 def get_attendees() -> list:
     sb = get_supabase()
     if sb:
         try:
             rows = sb.table("profiles").select("*").execute()
             if rows.data:
+                _update_cache(rows.data)
                 return rows.data
         except Exception as e:
             print(f"Supabase profiles fetch error: {e}")
-    return _MOCK_ATTENDEES
+    # Return everything we know: mock data overridden/merged with any
+    # profiles registered this session or previously fetched from Supabase.
+    return list(_profile_cache.values())
 
 # Cached view for endpoints that need it synchronously
 ATTENDEES: list = _MOCK_ATTENDEES
@@ -148,10 +163,9 @@ async def create_profile(request: Request):
         except Exception as e:
             print(f"Supabase profile insert error: {e}")
 
-    # Also add to in-memory ATTENDEES so this session sees them
-    global ATTENDEES
-    if not any(a["id"] == user_id for a in ATTENDEES):
-        ATTENDEES = get_attendees()
+    # Always add to in-memory cache so this session sees them even if
+    # Supabase is down or the write failed.
+    _profile_cache[user_id] = profile
 
     return profile
 
