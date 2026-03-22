@@ -7,7 +7,7 @@ An autonomous AI agent for live networking events. It reads every attendee profi
 ## Demo
 
 - [Video Pitch]() <!-- add YouTube/Loom link before submission -->
-- [Live App]() <!-- add Vercel URL before submission -->
+- [Live App](https://findmytribe-theta.vercel.app/)
 
 ## Tracks
 
