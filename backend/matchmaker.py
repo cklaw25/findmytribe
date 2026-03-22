@@ -119,17 +119,26 @@ def _batch_match_claude(user: dict, candidates: List[dict]) -> List[dict]:
 
     response = _retry(lambda: client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=8192,
+        max_tokens=16000,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_message}],
     ))
 
     content = response.content[0].text.strip()
-    # Strip any accidental markdown fences
-    if content.startswith("```"):
-        content = content.split("```")[1]
-        if content.startswith("json"):
-            content = content[4:]
+    # Strip markdown fences if present
+    if "```" in content:
+        # Extract content between first ``` and last ```
+        start = content.find("```")
+        end = content.rfind("```")
+        if start != end:
+            content = content[start+3:end].strip()
+            if content.startswith("json"):
+                content = content[4:].strip()
+    # Extract JSON object by finding outermost { }
+    brace_start = content.find("{")
+    brace_end = content.rfind("}")
+    if brace_start != -1 and brace_end != -1:
+        content = content[brace_start:brace_end+1]
     data = json.loads(content)
     return data.get("matches", [])
 
