@@ -93,8 +93,23 @@ app.add_middleware(
 from luffa_bot import router as luffa_router
 app.include_router(luffa_router)
 
-with open("mock_data.json") as f:
-    ATTENDEES: list = json.load(f)
+with open(_here / "mock_data.json") as f:
+    _MOCK_ATTENDEES: list = json.load(f)
+
+# Dynamic attendees: Supabase profiles + mock fallback
+def get_attendees() -> list:
+    sb = get_supabase()
+    if sb:
+        try:
+            rows = sb.table("profiles").select("*").execute()
+            if rows.data:
+                return rows.data
+        except Exception as e:
+            print(f"Supabase profiles fetch error: {e}")
+    return _MOCK_ATTENDEES
+
+# Cached view for endpoints that need it synchronously
+ATTENDEES: list = _MOCK_ATTENDEES
 
 _matched_users: set = set()
 
@@ -104,14 +119,52 @@ def root():
     return {"status": "FindMyTribe API running"}
 
 
+@app.post("/profiles")
+async def create_profile(request: Request):
+    """Register a new attendee profile. Stores in Supabase + returns generated userId."""
+    import uuid
+    data = await request.json()
+    name = data.get("name", "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="name required")
+
+    user_id = f"usr_{uuid.uuid4().hex[:8]}"
+    profile = {
+        "id": user_id,
+        "name": name,
+        "role": data.get("role", "Attendee"),
+        "company": data.get("company", ""),
+        "bio": data.get("bio", f"{data.get('role','Attendee')} attending Encode Club AI London."),
+        "interests": data.get("interests", []),
+        "goals": data.get("goals", ""),
+        "past_events": [],
+        "mutual_friend_ids": [],
+    }
+
+    sb = get_supabase()
+    if sb:
+        try:
+            sb.table("profiles").upsert(profile).execute()
+        except Exception as e:
+            print(f"Supabase profile insert error: {e}")
+
+    # Also add to in-memory ATTENDEES so this session sees them
+    global ATTENDEES
+    if not any(a["id"] == user_id for a in ATTENDEES):
+        ATTENDEES = get_attendees()
+
+    return profile
+
+
 @app.get("/attendees")
 def get_all_attendees():
-    return ATTENDEES
+    return get_attendees()
 
 
 @app.get("/attendees/{user_id}")
 def get_attendee(user_id: str):
-    user = next((a for a in ATTENDEES if a["id"] == user_id), None)
+    attendees = get_attendees()
+    user = next((a for a in attendees if a["id"] == user_id), None)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
@@ -119,12 +172,13 @@ def get_attendee(user_id: str):
 
 @app.post("/match/{user_id}")
 def get_tribe_list(user_id: str):
-    user = next((a for a in ATTENDEES if a["id"] == user_id), None)
+    attendees = get_attendees()
+    user = next((a for a in attendees if a["id"] == user_id), None)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     try:
-        result = build_tribe_list(user, ATTENDEES)
+        result = build_tribe_list(user, attendees)
     except Exception as e:
         print(f"build_tribe_list error: {e}")
         raise HTTPException(status_code=500, detail="Matchmaking failed")
@@ -162,11 +216,12 @@ def get_tribe_list(user_id: str):
 
 @app.get("/debug/match/{user_id}")
 def debug_match(user_id: str):
-    user = next((a for a in ATTENDEES if a["id"] == user_id), None)
+    attendees = get_attendees()
+    user = next((a for a in attendees if a["id"] == user_id), None)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    result = build_tribe_list(user, ATTENDEES)
+    result = build_tribe_list(user, attendees)
     debug = result["debug"]
     debug["supabase_connected"] = get_supabase() is not None
 
@@ -310,9 +365,10 @@ def event_overview():
         except Exception as e:
             print(f"Supabase overview locations error: {e}")
 
+    all_attendees = get_attendees()
     zone_counts: dict = {}
     attendees_with_zones = []
-    for a in ATTENDEES:
+    for a in all_attendees:
         zone = locations.get(a["id"], "unknown")
         zone_counts[zone] = zone_counts.get(zone, 0) + 1
         attendees_with_zones.append({**a, "zone": zone})
@@ -326,7 +382,7 @@ def event_overview():
             pass
 
     return {
-        "total_attendees": len(ATTENDEES),
+        "total_attendees": len(all_attendees),
         "matches_made": matches_made,
         "zone_counts": zone_counts,
         "attendees": attendees_with_zones,
