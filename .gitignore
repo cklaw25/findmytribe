@@ -13,3 +13,6 @@ frontend/.env.local
 # General
 .DS_Store
 *.log
+RENDER_ENV_VARS.txt
+VERCEL_ENV_VARS.txt
+RUN_THIS_SQL_MEMPHIS_PROFILE.txt
