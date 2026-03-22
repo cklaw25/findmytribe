@@ -1,0 +1,19 @@
+INSERT INTO profiles (id, name, role, company, bio, interests, goals, past_events, mutual_friend_ids)
+VALUES (
+  'usr_memphis',
+  'Memphis D Law',
+  'Biomedical Engineering Student',
+  'King''s College London',
+  'Biomedical engineering student at KCL exploring the intersection of AI and healthcare. Building at the frontier of med-tech and intelligent systems.',
+  '["biomedical engineering", "AI in healthcare", "med-tech", "machine learning", "startups"]',
+  'Meet founders and engineers working on AI + healthcare, explore co-building opportunities',
+  '["Encode Club AI London 2026"]',
+  '[]'
+)
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  role = EXCLUDED.role,
+  company = EXCLUDED.company,
+  bio = EXCLUDED.bio,
+  interests = EXCLUDED.interests,
+  goals = EXCLUDED.goals;

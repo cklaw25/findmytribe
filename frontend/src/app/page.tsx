@@ -6,11 +6,12 @@ import { updateLocation } from "@/lib/api";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 const DEMO_USERS = [
-  { id: "usr_001", initials: "AP", name: "Aisha Patel",     role: "AI Engineer · DeepMind" },
-  { id: "usr_002", initials: "JO", name: "James Okafor",    role: "Founder · Stealth" },
-  { id: "usr_003", initials: "SM", name: "Sofia Marchetti", role: "ML Researcher · UCL" },
-  { id: "usr_006", initials: "LF", name: "Luca Ferreira",   role: "Full Stack Dev · Freelance" },
-  { id: "usr_015", initials: "OH", name: "Omar Hassan",     role: "Student · Imperial College" },
+  { id: "usr_memphis", initials: "ML", name: "Memphis D Law",    role: "Biomedical Eng · KCL" },
+  { id: "usr_001",     initials: "AP", name: "Aisha Patel",      role: "AI Engineer · DeepMind" },
+  { id: "usr_002",     initials: "JO", name: "James Okafor",     role: "Founder · Stealth" },
+  { id: "usr_003",     initials: "SM", name: "Sofia Marchetti",  role: "ML Researcher · UCL" },
+  { id: "usr_006",     initials: "LF", name: "Luca Ferreira",    role: "Full Stack Dev · Freelance" },
+  { id: "usr_015",     initials: "OH", name: "Omar Hassan",      role: "Student · Imperial College" },
 ];
 
 function getInitials(name: string) {

@@ -193,5 +193,16 @@
     "goals": "Learn from experienced devs and find internship opportunities",
     "past_events": ["Imperial Hackathon 2025"],
     "mutual_friend_ids": ["usr_003"]
+  },
+  {
+    "id": "usr_memphis",
+    "name": "Memphis D Law",
+    "role": "Biomedical Engineering Student",
+    "company": "King's College London",
+    "bio": "Biomedical engineering student at KCL exploring the intersection of AI and healthcare. Building at the frontier of med-tech and intelligent systems.",
+    "interests": ["biomedical engineering", "AI in healthcare", "med-tech", "machine learning", "startups"],
+    "goals": "Meet founders and engineers working on AI + healthcare, explore co-building opportunities",
+    "past_events": ["Encode Club AI London 2026"],
+    "mutual_friend_ids": []
   }
 ]
